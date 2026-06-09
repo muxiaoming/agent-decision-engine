@@ -1,0 +1,182 @@
+# ============================================================
+# Langfuse 3 自托管 Docker Compose 部署
+# ============================================================
+# 启动: docker compose -f docker/docker-compose-langfuse.yml up -d
+# 访问: http://localhost:3000
+# 首次启动后注册账号 → 创建项目 → 获取 API Keys
+# ============================================================
+
+services:
+  # ── Langfuse Web 应用 ──
+  langfuse-web:
+    image: langfuse/langfuse:3
+    container_name: langfuse-web
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@langfuse-db:5432/langfuse
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=langfuse-nextauth-secret-for-local-dev-only
+      - SALT=langfuse-salt-for-local-dev-only
+      - ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000
+      - CLICKHOUSE_URL=http://langfuse-clickhouse:8123
+      - CLICKHOUSE_MIGRATION_URL=clickhouse://langfuse-clickhouse:9000
+      - CLICKHOUSE_USER=clickhouse
+      - CLICKHOUSE_PASSWORD=clickhouse
+      - CLICKHOUSE_CLUSTER_ENABLED=false
+      - REDIS_HOST=langfuse-redis
+      - REDIS_PORT=6379
+      - REDIS_AUTH=langfuse-redis-secret
+      - LANGFUSE_S3_EVENT_UPLOAD_ENABLED=true
+      - LANGFUSE_S3_EVENT_UPLOAD_BUCKET=langfuse-events
+      - LANGFUSE_S3_EVENT_UPLOAD_REGION=us-east-1
+      - LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT=http://langfuse-minio:9000
+      - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=minioadmin
+      - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=minioadmin
+      - LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE=true
+      - LANGFUSE_S3_BATCH_EXPORT_ENABLED=false
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_started
+      langfuse-minio:
+        condition: service_started
+    networks:
+      - langfuse-net
+
+  # ── Langfuse Worker（后台任务处理） ──
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    container_name: langfuse-worker
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@langfuse-db:5432/langfuse
+      - NEXTAUTH_URL=http://localhost:3000
+      - SALT=langfuse-salt-for-local-dev-only
+      - ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000
+      - CLICKHOUSE_URL=http://langfuse-clickhouse:8123
+      - CLICKHOUSE_MIGRATION_URL=clickhouse://langfuse-clickhouse:9000
+      - CLICKHOUSE_USER=clickhouse
+      - CLICKHOUSE_PASSWORD=clickhouse
+      - CLICKHOUSE_CLUSTER_ENABLED=false
+      - REDIS_HOST=langfuse-redis
+      - REDIS_PORT=6379
+      - REDIS_AUTH=langfuse-redis-secret
+      - LANGFUSE_S3_EVENT_UPLOAD_ENABLED=true
+      - LANGFUSE_S3_EVENT_UPLOAD_BUCKET=langfuse-events
+      - LANGFUSE_S3_EVENT_UPLOAD_REGION=us-east-1
+      - LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT=http://langfuse-minio:9000
+      - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=minioadmin
+      - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=minioadmin
+      - LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE=true
+      - LANGFUSE_S3_BATCH_EXPORT_ENABLED=false
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_started
+      langfuse-minio:
+        condition: service_started
+    networks:
+      - langfuse-net
+
+  # ── PostgreSQL ──
+  langfuse-db:
+    image: postgres:16-alpine
+    container_name: langfuse-db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=langfuse
+    volumes:
+      - langfuse-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - langfuse-net
+
+  # ── Redis ──
+  langfuse-redis:
+    image: redis:7-alpine
+    container_name: langfuse-redis
+    command: >
+      redis-server
+      --requirepass langfuse-redis-secret
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "langfuse-redis-secret", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - langfuse-net
+
+  # ── ClickHouse ──
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server:24-alpine
+    container_name: langfuse-clickhouse
+    environment:
+      - CLICKHOUSE_DB=langfuse
+      - CLICKHOUSE_USER=clickhouse
+      - CLICKHOUSE_PASSWORD=clickhouse
+    volumes:
+      - langfuse-ch-data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - langfuse-net
+
+  # ── MinIO（S3 兼容对象存储，Langfuse v3 事件存储必需） ──
+  langfuse-minio:
+    image: minio/minio:latest
+    container_name: langfuse-minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - langfuse-minio-data:/data
+    networks:
+      - langfuse-net
+
+  # ── MinIO 初始化（自动创建 Langfuse 所需的 Bucket） ──
+  langfuse-minio-init:
+    image: minio/mc:latest
+    container_name: langfuse-minio-init
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://langfuse-minio:9000 minioadmin minioadmin;
+      mc mb --ignore-existing local/langfuse-events;
+      echo 'MinIO bucket langfuse-events created';
+      "
+    depends_on:
+      langfuse-minio:
+        condition: service_started
+    networks:
+      - langfuse-net
+
+volumes:
+  langfuse-pg-data:
+  langfuse-ch-data:
+  langfuse-minio-data:
+
+networks:
+  langfuse-net:
+    driver: bridge

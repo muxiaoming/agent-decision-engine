@@ -1,0 +1,15 @@
+# Langfuse 云端模式配置
+langfuse:
+  mode: cloud
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      # Langfuse 3 OTLP 端点：必须使用完整的 /v1/traces 路径
+      endpoint: https://cloud.langfuse.com/api/public/otel/v1/traces
+      headers:
+        Authorization: "Basic ${LANGFUSE_AUTH:}"
+        x-langfuse-ingestion-version: "4"
