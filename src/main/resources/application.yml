@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: springai-langfuse3-demo
+  profiles:
+    default: local
+  ai:
+    deepseek:
+      api-key: ${DEEPSEEK_API_KEY:your-deepseek-api-key}
+      chat:
+        model: deepseek-chat
+      base-url: https://api.deepseek.com
+    openai:
+      api-key: ${MIMO_API_KEY:your-mimo-api-key}
+      base-url: https://token-plan-cn.xiaomimimo.com/v1
+      chat:
+        model: xiaomi/mimo-v2.5-pro
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:your-dashscope-api-key}
+    # Spring AI 观测配置（Langfuse 官方推荐）
+    chat:
+      observations:
+        log-prompt: true       # 在 Trace 中记录提示词内容
+        log-completion: true   # 在 Trace 中记录补全内容
+
+server:
+  port: 8181
+
+# OpenTelemetry + Micrometer 观测配置（Langfuse 官方推荐）
+management:
+  observations:
+    annotations:
+      enabled: true
+    enable:
+      "http.server.requests": false  # 抑制 Micrometer 重复 HTTP Span
+      "http.client.requests": false  # 抑制 Micrometer 重复 HTTP Span
+
+# 抑制 OTel 自动配置的重复 HTTP Span
+otel:
+  instrumentation:
+    spring-webmvc:
+      enabled: false
+    spring-web:
+      enabled: false
