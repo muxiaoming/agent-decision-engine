@@ -1,0 +1,24 @@
+Spring AI + Langfuse3 演示项目
+
+本项目是一个基于 Java 21 + Spring Boot 3 的 Spring AI 演示项目。
+
+核心功能：
+1. 多模型切换：支持 DeepSeek、MiMo、通义千问三个 AI 模型，通过配置自由切换。
+2. 流式输出：提供 Flux、SSE、SseEmitter 三种流式输出方案。
+3. RAG 知识库问答：基于本地文档构建知识库，结合大模型生成准确回答。
+4. Function Calling：AI 模型根据用户意图自动调用外部工具。
+5. Graph 工作流：基于图的多步骤 AI 工作流编排。
+6. Langfuse 可观测性：通过 OpenTelemetry 将全链路追踪上报至 Langfuse。
+
+技术栈：
+- Java 21 (LTS)
+- Spring Boot 3.4.x
+- Spring AI 1.x
+- Spring AI Alibaba
+- OpenTelemetry + Langfuse 3
+
+项目特点：
+- 采用流式优先架构，所有 AI 响应端点支持实时流式输出。
+- 通过 OpenTelemetry 实现全链路追踪，每次 AI 请求均被追踪。
+- 支持 Langfuse 云端和本地 Docker 两种部署模式。
+- 每个功能模块独立可测试。
