@@ -74,6 +74,12 @@ public class LangfuseTestController {
         return doTest("deepSeekChatModel", "deepseek-chat", message);
     }
 
+    @GetMapping("/test-dashscope")
+    public ResponseEntity<Map<String, Object>> testDashscope(
+            @RequestParam(defaultValue = "你好，请用一句话介绍自己") String message) {
+        return doTest("dashscopeChatModel", "dashscope-chat", message);
+    }
+
     /**
      * 通用测试方法：调用指定模型并返回结果，包含 OTel Trace ID 便于在 Langfuse 中查找。
      */
