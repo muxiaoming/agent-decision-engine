@@ -11,11 +11,15 @@ spring:
       base-url: https://api.deepseek.com
     openai:
       api-key: ${MIMO_API_KEY:your-mimo-api-key}
-      base-url: https://token-plan-cn.xiaomimimo.com/v1
+      base-url: https://token-plan-cn.xiaomimimo.com
       chat:
-        model: xiaomi/mimo-v2.5-pro
+        options:
+          model: xiaomi/mimo-v2.5-pro
     dashscope:
       api-key: ${DASHSCOPE_API_KEY:your-dashscope-api-key}
+      chat:
+        options:
+          model: qwen-plus-2025-01-25
     # Spring AI 观测配置（Langfuse 官方推荐）
     chat:
       observations:
