@@ -17,9 +17,13 @@
 
 ## 3. Langfuse 3 / OTel Observability
 
-- [ ] 3.1 配置 OTLP Exporter：在 `application.yml` 中设置 `OTEL_EXPORTER_OTLP_ENDPOINT` 和 `OTEL_EXPORTER_OTLP_HEADERS`（支持环境变量覆盖）
-- [ ] 3.2 实现 `LangfuseProperties` 配置属性类：读取 `app.langfuse.*` 配置，自动生成 Basic Auth Header
-- [ ] 3.3 验证自动 Trace 采集：启动应用后调用 `/api/chat`，在 Langfuse 中确认 Trace / Span / Generation 自动生成
+- [ ] 3.1 创建 `LangfuseProperties` 配置属性类：读取 `app.langfuse.*` 配置（mode、public-key、secret-key、cloud-region、self-hosted-url），自动生成 Basic Auth Header 和 OTLP endpoint
+- [ ] 3.2 创建 `application-langfuse-cloud.yml` Profile：配置 Langfuse Cloud OTLP 端点（默认 EU，支持 US/JP region 切换）
+- [ ] 3.3 创建 `application-langfuse-local.yml` Profile：配置本地自部署 Langfuse OTLP 端点 `http://localhost:3000/api/public/otel`
+- [ ] 3.4 创建 `docker-compose.langfuse.yml`：Langfuse Server + PostgreSQL + Redis 一键本地部署，预设项目 Public/Secret Key 环境变量
+- [ ] 3.5 配置 OTLP Exporter：在主 `application.yml` 中通过 `LangfuseProperties` 动态组装 `OTEL_EXPORTER_OTLP_ENDPOINT` 和 `OTEL_EXPORTER_OTLP_HEADERS`
+- [ ] 3.6 验证 Cloud 模式：`--spring.profiles.active=langfuse-cloud` 启动后调用 `/api/chat`，在 Langfuse Cloud 确认 Trace 自动生成
+- [ ] 3.7 验证 Local 模式：启动 `docker-compose.langfuse.yml`，`--spring.profiles.active=langfuse-local` 启动后在本地 Langfuse UI 确认 Trace 自动生成
 
 ## 4. Multi-Model Chat
 
@@ -56,5 +60,4 @@
 
 - [ ] 8.1 编写端到端集成测试：覆盖 Chat、RAG、Function Call、Graph 四个 API 端点
 - [ ] 8.2 创建 `curl` 示例脚本：`examples/curl-examples.sh` 包含所有 API 的调用示例
-- [ ] 8.3 创建 `docker-compose.yml`：可选的 Langfuse + PostgreSQL 本地开发环境
-- [ ] 8.4 编写 `README.md`：项目说明、快速启动指南、配置说明、API 文档
+- [ ] 8.3 编写 `README.md`：项目说明、快速启动指南（Cloud 模式 + 本地模式）、配置说明、API 文档

@@ -1,50 +1,165 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+  同步影响报告
+  ============
+  版本变更: 1.0.0 → 1.1.0
+  修改原则:
+    - I. 多模型灵活切换（原文: Multi-Model Flexibility）
+    - II. 流式优先架构（原文: Streaming-First Architecture）
+    - III. 可观测性驱动（原文: Observability-Driven）
+    - IV. 测试先行、绿灯提交（原文: Test-First, Commit-on-Green）
+    - V. AI 原生功能完备性（原文: AI-Native Feature Completeness）
+    - VI. 双模式部署可观测（原文: Dual Deployment for Observability）
+  新增原则:
+    - VII. 统一简体中文文档
+  新增章节: 无（新增原则已含于 Core Principles 内）
+  移除章节: 无
+  需更新的模板:
+    - .specify/templates/plan-template.md ✅ 兼容（Constitution Check 区段已就绪）
+    - .specify/templates/spec-template.md ✅ 兼容（需求结构对齐）
+    - .specify/templates/tasks-template.md ✅ 兼容（阶段划分支持可观测性/测试任务）
+  后续待办: 无
+-->
 
-## Core Principles
+# Spring AI + Langfuse3 演示项目宪章
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+## 核心原则
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### I. 多模型灵活切换
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+系统必须支持 DeepSeek、MiMo、DashScope 三个 AI 模型提供者，
+且三者可互换使用。用户必须能够在运行时仅通过配置切换模型，
+无需修改代码。每个模型集成必须符合 Spring AI 统一的
+`ChatModel` 接口。控制器或服务中不得出现模型特定的业务逻辑；
+所有模型差异必须封装在 Spring AI 抽象层之后。
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+**理由**: 演示与提供者无关的设计能够体现 Spring AI 的核心价值，
+确保本项目在模型演进或新提供者出现时仍然具有参考意义。
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### II. 流式优先架构
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+所有 AI 响应端点必须支持实时流式输出。项目必须演示三种流式
+机制：`SseEmitter`、Server-Sent Events (SSE) 和 Project
+Reactor `Flux`。每种机制必须可独立测试，并拥有自己的端点。
+非流式（同步）端点仅作为补充，不得替代流式端点。
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+**理由**: 流式输出是 LLM 应用的标准用户体验。演示三种方式可为
+不同集成场景提供完整参考。
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+### III. 可观测性驱动
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+每一个 AI 请求必须通过 OpenTelemetry 进行端到端链路追踪，
+并上报至 Langfuse。追踪内容包括：提示词/补全内容、模型名称、
+Token 用量、延迟和错误状态。所有追踪数据必须在请求完成后
+30 秒内可在 Langfuse 界面中可见。无一例外——只要涉及模型调用，
+就必须被观测。
 
-## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+**理由**: 没有可观测性的 AI 应用是不可调试的黑盒。全链路追踪是
+不可妥协的基线要求，而非锦上添花。
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+### IV. 测试先行、绿灯提交
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+所有代码变更必须先通过 `mvn test` 才能提交。工作流程为：
+实现 → `mvn test` → 全部通过 → `git commit`。测试失败必须
+阻止提交。测试覆盖至少包括：服务逻辑的单元测试、流式端点的
+集成测试、模型连通性的冒烟测试。
+
+**理由**: 未经测试的 AI 代码与损坏的代码无异。自动测试后提交的
+流程可防止回归问题累积。
+
+### V. AI 原生功能完备性
+
+演示项目必须包含以下 Spring AI 能力，每个功能作为独立可测试
+的模块：
+
+- **RAG**（检索增强生成）：集成向量存储，必须演示文档摄入、
+  向量嵌入和上下文感知的问答能力。
+- **Function Calling**（函数调用）：通过 Spring AI 的函数调用
+  机制注册和调用工具。必须包含至少一个自定义工具定义。
+- **Spring AI Alibaba Graph**（图工作流编排）：使用基于图的
+  多步骤 AI 流程编排。必须演示至少一个包含条件分支的多节点图。
+
+每个功能必须拥有自己的控制器端点、服务层和对应的测试。
+
+**理由**: 这三项能力代表了 Spring AI 在简单对话之外的核心价值。
+缺少任何一项都会使演示项目作为参考不够完整。
+
+### VI. 双模式部署可观测
+
+Langfuse 必须支持两种部署模式的配置：
+
+- **云端模式**：托管的 Langfuse SaaS 服务，使用 API 密钥认证。
+- **自部署模式**：本地 Docker Compose 部署。
+
+系统必须支持通过单一配置属性在两种模式之间切换
+（例如 `langfuse.mode=cloud|local`）。两种模式必须产生等效的
+追踪数据。仓库中必须包含自部署模式的 Docker Compose 文件。
+
+**理由**: 自部署模式支持离线开发和成本控制；云端模式支持团队协作。
+两种都是真实生产场景，演示项目必须覆盖。
+
+### VII. 统一简体中文文档
+
+项目中所有文档内容、任务描述、代码注释和 Git 提交备注
+必须统一使用简体中文撰写。禁止使用英文撰写说明性文案。
+以下内容不受此约束限制：代码标识符（变量名、方法名、类名）、
+技术专有名词（如 Spring AI、Langfuse、OpenTelemetry）、
+配置键名和属性值、第三方库名称。
+
+**理由**: 统一的语言可确保团队阅读体验一致，降低中文开发者的
+理解门槛。技术标识符保持英文是为了与生态系统保持兼容。
+
+## 技术栈与约束
+
+| 层级           | 技术                                | 版本/说明                       |
+| -------------- | ----------------------------------- | ------------------------------- |
+| 编程语言       | Java                                | 21（LTS）                       |
+| 应用框架       | Spring Boot                         | 3.x                             |
+| 构建工具       | Maven                               | 优先使用 Wrapper                |
+| AI 框架        | Spring AI                           | 最新稳定版                      |
+| AI 提供者      | DeepSeek、MiMo、DashScope           | 通过 Spring AI 集成             |
+| 可观测性       | Langfuse 3 + OpenTelemetry          | 云端 + Docker 自部署            |
+| 流式输出       | SseEmitter、SSE、Flux               | 三个独立端点                    |
+| 测试框架       | JUnit 5 + Mockito + Spring Test     | Maven Surefire/Failsafe         |
+
+**约束条件**：
+- Java 版本必须为 21 或更高；不向下兼容 Java 17 及以下版本。
+- 所有依赖必须通过 Maven BOM 或 `dependencyManagement` 管理；
+  不得在各模块 POM 中使用版本字面量。
+- API 密钥和敏感信息不得提交至仓库；必须使用环境变量或
+  Spring Profiles 管理。
+
+## 开发工作流
+
+1. **分支**：从 `main` 创建功能分支。
+2. **实现**：按照上述原则编写代码。
+3. **测试**：运行 `mvn test`——全部测试必须通过。
+4. **提交**：绿灯后使用规范化的中文提交信息进行提交。
+5. **推送**：推送至远程仓库，必要时创建 PR。
+
+**质量门禁**：
+- `mvn test` 零失败通过。
+- 提交文件中不得包含硬编码的 API 密钥或敏感信息。
+- 每个 AI 端点至少有一个对应的测试。
+- 新增流式端点必须演示三种流式机制中的至少一种。
+- 所有文档、任务描述、代码注释和提交信息必须使用简体中文。
+
+## 治理
+
+本宪章是项目所有开发决策的权威参考。当代码变更与某条原则冲突时，
+以原则为准，除非该原则已被正式修订。
+
+**修订流程**：
+1. 提出变更建议并附上理由。
+2. 按语义化版本规则升级版本号：
+   - 主版本（MAJOR）：原则移除或不兼容的重新定义。
+   - 次版本（MINOR）：新增原则或实质性扩展。
+   - 补丁版本（PATCH）：措辞澄清、文字修正。
+3. 将 `LAST_AMENDED_DATE` 更新为修订日期。
+4. 运行同步影响报告，识别受影响的模板。
+5. 使用以下提交信息提交修订：
+   `docs: 修订宪章至 vX.Y.Z`
+
+**合规审查**：所有 PR 和代码审查必须验证是否符合上述七条核心原则。
+违反原则的变更必须在实施计划的"复杂度追踪"表中记录理由后方可合并。
+
+**版本**: 1.1.0 | **批准日期**: 2026-06-03 | **最后修订**: 2026-06-03
