@@ -29,6 +29,10 @@ public class RagController {
     @PostMapping("/ask")
     public ResponseEntity<ChatResponse> ask(@RequestBody Map<String, String> request) {
         String message = request.get("message");
+        if (message == null || message.isBlank()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "message 不能为空");
+        }
         String modelName = request.getOrDefault("modelName", "deepSeekChatModel");
         return ResponseEntity.ok(ragService.ask(message, modelName));
     }

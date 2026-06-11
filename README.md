@@ -66,11 +66,12 @@
 # 1. 启动 Langfuse 本地部署
 docker compose -f docker/docker-compose-langfuse.yml up -d
 
-# 2. 配置 API 密钥（复制 application-dev.yml 填入真实密钥）
-cp src/main/resources/application-dev.yml.example src/main/resources/application-dev.yml
+# 2. 配置 API 密钥
+#    在 src/main/resources/ 下创建 application-dev.yml，填入真实密钥
+#    参考 application.yml 中的 ${ENV_VAR:placeholder} 格式
 
-# 3. 启动应用
-./mvnw spring-boot:run
+# 3. 启动应用（加载 dev profile 获取密钥）
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
 
 # 4. 测试聊天 API
 curl -X POST http://localhost:8181/api/chat \

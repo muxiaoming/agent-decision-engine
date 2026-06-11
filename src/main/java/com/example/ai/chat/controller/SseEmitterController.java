@@ -66,7 +66,6 @@ public class SseEmitterController {
         });
 
         emitter.onTimeout(emitter::complete);
-        emitter.onCompletion(() -> { /* 清理资源 */ });
 
         return emitter;
     }

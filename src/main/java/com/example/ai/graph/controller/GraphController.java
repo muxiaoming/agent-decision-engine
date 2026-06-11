@@ -26,7 +26,9 @@ public class GraphController {
     @PostMapping("/execute")
     public ResponseEntity<Map<String, Object>> execute(@RequestBody Map<String, String> request) {
         String input = request.get("input");
-        String model = request.getOrDefault("model", "dashscope");
+        if (input == null || input.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "input 不能为空"));
+        }
 
         long startTime = System.currentTimeMillis();
         Map<String, Object> result = graphService.execute(input);
@@ -38,7 +40,6 @@ public class GraphController {
         return ResponseEntity.ok(Map.of(
                 "output", output,
                 "branch", category,
-                "model", model,
                 "durationMs", totalDuration
         ));
     }
