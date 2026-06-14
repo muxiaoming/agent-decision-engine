@@ -1,10 +1,8 @@
 package com.example.ai.observability.controller;
 
-import com.example.ai.common.model.ChatResponse;
 import com.example.ai.common.model.TokenUsage;
 import com.example.ai.common.router.ModelRouter;
 import com.example.ai.observability.config.LangfuseConfig;
-import io.micrometer.tracing.Tracer;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +17,7 @@ import java.util.Map;
 
 /**
  * Langfuse 可观测性验证控制器。
- * 提供模型测试端点，用于验证 Langfuse Trace 是否正常上报。
+ * HTTP span 自动作为根 span（由 opentelemetry-spring-boot-starter 创建）。
  */
 @RestController
 @RequestMapping("/api/observability")
@@ -29,12 +27,10 @@ public class LangfuseTestController {
 
     private final ModelRouter modelRouter;
     private final LangfuseConfig langfuseConfig;
-    private final Tracer tracer;
 
-    public LangfuseTestController(ModelRouter modelRouter, LangfuseConfig langfuseConfig, Tracer tracer) {
+    public LangfuseTestController(ModelRouter modelRouter, LangfuseConfig langfuseConfig) {
         this.modelRouter = modelRouter;
         this.langfuseConfig = langfuseConfig;
-        this.tracer = tracer;
     }
 
     /**
@@ -81,50 +77,42 @@ public class LangfuseTestController {
     }
 
     /**
-     * 通用测试方法：调用指定模型并返回结果，包含 OTel Trace ID 便于在 Langfuse 中查找。
+     * 通用测试方法：调用指定模型并返回结果。
+     * 不再手动创建 Span，HTTP 请求由 OTel 自动探针自动作为根 span。
      */
     private ResponseEntity<Map<String, Object>> doTest(
             String modelName, String modelDisplayName, String message) {
         long startTime = System.currentTimeMillis();
 
-        // 创建自定义 Span 包裹 AI 调用，确保 Trace ID 可被捕获
-        io.micrometer.tracing.Span testSpan = tracer.nextSpan().name("observability-test-" + modelDisplayName).start();
-        String traceId = testSpan.context().traceId();
+        ChatClient client = modelRouter.route(modelName);
 
-        try (io.micrometer.tracing.Tracer.SpanInScope ws = tracer.withSpan(testSpan)) {
-            ChatClient client = modelRouter.route(modelName);
+        org.springframework.ai.chat.model.ChatResponse chatResponse = client.prompt()
+                .user(message)
+                .call()
+                .chatResponse();
 
-            org.springframework.ai.chat.model.ChatResponse chatResponse = client.prompt()
-                    .user(message)
-                    .call()
-                    .chatResponse();
+        String content = chatResponse.getResult().getOutput().getText();
+        Usage usage = chatResponse.getMetadata().getUsage();
+        long durationMs = System.currentTimeMillis() - startTime;
 
-            String content = chatResponse.getResult().getOutput().getText();
-            Usage usage = chatResponse.getMetadata().getUsage();
-            long durationMs = System.currentTimeMillis() - startTime;
+        TokenUsage tokenUsage = new TokenUsage(
+                usage.getPromptTokens(),
+                usage.getCompletionTokens(),
+                usage.getTotalTokens()
+        );
 
-            TokenUsage tokenUsage = new TokenUsage(
-                    usage.getPromptTokens(),
-                    usage.getCompletionTokens(),
-                    usage.getTotalTokens()
-            );
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("model", modelDisplayName);
+        result.put("content", content);
+        result.put("tokenUsage", tokenUsage);
+        result.put("durationMs", durationMs);
+        result.put("langfuseMode", langfuseConfig.getMode());
+        result.put("langfuseUrl", langfuseConfig.isLocalMode()
+                ? "http://localhost:3000"
+                : "https://cloud.langfuse.com");
+        result.put("tip", "在 Langfuse 界面查看 Trace（HTTP root span + AI GENERATION child span）");
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("model", modelDisplayName);
-            result.put("content", content);
-            result.put("tokenUsage", tokenUsage);
-            result.put("durationMs", durationMs);
-            result.put("traceId", traceId);
-            result.put("langfuseMode", langfuseConfig.getMode());
-            result.put("langfuseUrl", langfuseConfig.isLocalMode()
-                    ? "http://localhost:3000"
-                    : "https://cloud.langfuse.com");
-            result.put("tip", "在 Langfuse 界面搜索 Trace ID: " + traceId);
-
-            return ResponseEntity.ok(result);
-        } finally {
-            testSpan.end();
-        }
+        return ResponseEntity.ok(result);
     }
 
     /**

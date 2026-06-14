@@ -2,7 +2,10 @@ spring:
   application:
     name: springai-langfuse3-demo
   profiles:
-    default: local
+    active: local,dev
+  mvc:
+    favicon:
+      enabled: false       # 禁用 favicon.ico 请求，避免 500 错误噪音
   ai:
     deepseek:
       api-key: ${DEEPSEEK_API_KEY:your-deepseek-api-key}
@@ -14,7 +17,7 @@ spring:
       base-url: https://token-plan-cn.xiaomimimo.com
       chat:
         options:
-          model: xiaomi/mimo-v2.5-pro
+          model: xiaomi/mimo-v2.5
     dashscope:
       api-key: ${DASHSCOPE_API_KEY:your-dashscope-api-key}
       chat:
@@ -27,21 +30,23 @@ spring:
         log-completion: true   # 在 Trace 中记录补全内容
 
 server:
-  port: 8181
+  port: 8182
 
 # OpenTelemetry + Micrometer 观测配置（Langfuse 官方推荐）
 management:
   observations:
     annotations:
-      enabled: true
-    enable:
-      "http.server.requests": false  # 抑制 Micrometer 重复 HTTP Span
-      "http.client.requests": false  # 抑制 Micrometer 重复 HTTP Span
+      enabled: true       # Enable @Observed 注解
 
-# 抑制 OTel 自动配置的重复 HTTP Span
+# OTel 配置
 otel:
-  instrumentation:
-    spring-webmvc:
-      enabled: false
-    spring-web:
-      enabled: false
+  logs:
+    exporter: none
+  metrics:
+    exporter: none
+  exporter:
+    otlp:
+      endpoint: http://localhost:3000/api/public/otel
+      headers:
+        Authorization: "Basic cGstbGYtNjkxNDA3NzItMzgzMi00ZWU1LWExOTEtNWU5MWViNTdjNjEwOnNrLWxmLWI2ZDFmOTQ2LTMxOWEtNDE1Yy04MzM1LTI4N2JhNmY3YjRlYQ=="
+        x-langfuse-ingestion-version: "4"

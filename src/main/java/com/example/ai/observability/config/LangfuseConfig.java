@@ -19,7 +19,7 @@ public class LangfuseConfig {
     @Value("${langfuse.mode:local}")
     private String mode;
 
-    @Value("${management.otlp.tracing.endpoint:}")
+    @Value("${otel.exporter.otlp.endpoint:}")
     private String otlpEndpoint;
 
     public String getMode() {

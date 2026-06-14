@@ -41,11 +41,14 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            <!--
-              重要：不要引入 opentelemetry-instrumentation-bom！
-              Spring Boot 3.4.5 已通过 spring-boot-dependencies 管理 OTel 版本。
-              引入 instrumentation BOM 会导致版本冲突。
-            -->
+            <!-- OpenTelemetry Instrumentation BOM（Langfuse 官方推荐版本） -->
+            <dependency>
+                <groupId>io.opentelemetry.instrumentation</groupId>
+                <artifactId>opentelemetry-instrumentation-bom</artifactId>
+                <version>2.17.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -65,11 +68,6 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Spring Boot Actuator（启用 Micrometer Observation） -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
-        </dependency>
 
         <!-- Spring AI 模型集成 -->
         <dependency>
@@ -95,16 +93,30 @@
             <artifactId>spring-ai-alibaba-graph-core</artifactId>
         </dependency>
 
-        <!-- ===== Langfuse 3 + OpenTelemetry（最简方案，零版本冲突） ===== -->
-        <!--
-          只需两个依赖，版本全部由 Spring Boot BOM 管理：
-          1. micrometer-tracing-bridge-otel: Micrometer → OTel 桥接
-          2. opentelemetry-exporter-otlp: OTLP 导出器
-          不需要 opentelemetry-spring-boot-starter（它的最新版 2.9.0 与 Spring Boot 管理的 OTel 版本冲突）
-        -->
+        <!-- ===== Langfuse 3 + OpenTelemetry（官方推荐配置） ===== -->
+        <dependency>
+            <groupId>io.opentelemetry.instrumentation</groupId>
+            <artifactId>opentelemetry-spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-tracing-bridge-otel</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.opentelemetry.instrumentation</groupId>
+                    <artifactId>opentelemetry-instrumentation-api-incubator</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- 显式声明 2.17.0-alpha，覆盖 micrometer 传递的旧版 -->
+        <dependency>
+            <groupId>io.opentelemetry.instrumentation</groupId>
+            <artifactId>opentelemetry-instrumentation-api-incubator</artifactId>
+            <version>2.17.0-alpha</version>
         </dependency>
         <dependency>
             <groupId>io.opentelemetry</groupId>

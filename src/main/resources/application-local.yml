@@ -6,15 +6,3 @@ management:
   tracing:
     sampling:
       probability: 1.0   # 100% 采样，开发/演示环境全量追踪
-  otlp:
-    tracing:
-      # Langfuse 3 OTLP 端点：必须使用完整的 /v1/traces 路径
-      # （management.otlp.tracing.endpoint 映射到 OTEL_EXPORTER_OTLP_TRACES_ENDPOINT，SDK 不会自动追加路径）
-      endpoint: http://localhost:3000/api/public/otel/v1/traces
-      # Langfuse 3 OTLP 认证：Basic Auth (publicKey:secretKey 的 Base64)
-      # 首次启动后在 http://localhost:3000 创建项目获取密钥
-      # 生成命令: echo -n "pk-lf-xxx:sk-lf-xxx" | base64
-      # 真实密钥配置在 application-dev.yml（不提交）
-      headers:
-        Authorization: "Basic ${LANGFUSE_AUTH:your-langfuse-auth-base64}"
-        x-langfuse-ingestion-version: "4"
