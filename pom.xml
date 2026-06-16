@@ -11,11 +11,11 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.example</groupId>
-    <artifactId>springai-langfuse3-demo</artifactId>
+    <groupId>com.zhou</groupId>
+    <artifactId>agent-decision-engine</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>springai-langfuse3-demo</name>
-    <description>Spring AI + Langfuse3 完整演示项目</description>
+    <name>AgentDecisionEngine</name>
+    <description>基于 Spring AI + Langfuse 3 的多模型智能投资代理决策引擎</description>
 
     <properties>
         <java.version>21</java.version>
