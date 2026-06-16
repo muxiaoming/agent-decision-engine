@@ -67,7 +67,7 @@ springdoc:
   group-configs:
     - group: 'default'
       paths-to-match: '/**'
-      packages-to-scan: com.example.ai
+      packages-to-scan: com.zhou.ai
 
 # Knife4j 增强配置
 knife4j:
