@@ -29,7 +29,7 @@ public class RagService {
 
         org.springframework.ai.chat.model.ChatResponse chatResponse = client.prompt()
                 .user(message)
-                .advisors(new QuestionAnswerAdvisor(vectorStore))
+                .advisors(QuestionAnswerAdvisor.builder(vectorStore).build())
                 .call()
                 .chatResponse();
 
@@ -53,7 +53,7 @@ public class RagService {
 
         return client.prompt()
                 .user(message)
-                .advisors(new QuestionAnswerAdvisor(vectorStore))
+                .advisors(QuestionAnswerAdvisor.builder(vectorStore).build())
                 .stream()
                 .chatResponse()
                 .map(r -> r.getResult().getOutput().getText())

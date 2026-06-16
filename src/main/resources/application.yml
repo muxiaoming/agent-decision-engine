@@ -3,6 +3,11 @@ spring:
     name: springai-langfuse3-demo
   profiles:
     active: local,dev
+  autoconfigure:
+    exclude:
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAudioSpeechAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAudioTranscriptionAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeVideoAutoConfiguration
   mvc:
     favicon:
       enabled: false       # 禁用 favicon.ico 请求，避免 500 错误噪音
