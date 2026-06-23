@@ -135,6 +135,56 @@ curl -X POST http://localhost:8080/api/graph/execute \
   -d '{"input":"今天天气真好","model":"dashscope"}'
 ```
 
+### Skills Agent（新增）
+
+```bash
+# 列出可用技能
+curl http://localhost:8080/api/skills
+
+# Skills Agent 对话 - 市场分析
+curl -X POST http://localhost:8080/api/skills/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "分析一下A股市场"}'
+
+# Skills Agent 对话 - 天气查询
+curl -X POST http://localhost:8080/api/skills/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "北京今天天气怎么样？"}'
+
+# Skills Agent 多轮对话
+curl -X POST http://localhost:8080/api/skills/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "北京今天天气怎么样？", "threadId": "test-123"}'
+
+curl -X POST http://localhost:8080/api/skills/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "那穿什么衣服合适？", "threadId": "test-123"}'
+```
+
+### 投资工具（新增）
+
+```bash
+# 股价查询
+curl -X POST http://localhost:8080/api/tools/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "查询苹果公司的股价"}'
+
+# 市场指数查询
+curl -X POST http://localhost:8080/api/tools/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "查询上证指数"}'
+
+# 风险计算
+curl -X POST http://localhost:8080/api/tools/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "帮我计算60%股票、30%债券、10%现金的组合收益"}'
+
+# VaR 计算
+curl -X POST http://localhost:8080/api/tools/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "我投资了10万元，帮我计算95%置信水平下30天的VaR"}'
+```
+
 ### 查看 Trace
 
 发送请求后，打开 Langfuse 界面（云端或本地）查看 Trace 记录，
@@ -153,17 +203,48 @@ springai-langfuse3-demo/
 ├── pom.xml                          # Maven 父 POM
 ├── docker/
 │   └── docker-compose-langfuse.yml  # Langfuse 本地部署
-├── src/main/java/com/example/ai/
+├── src/main/java/com/zhou/ai/
 │   ├── common/                      # 公共配置和模型路由
-│   ├── chat/                        # 流式对话端点
-│   ├── rag/                         # RAG 知识库问答
-│   ├── tools/                       # Function Calling
+│   ├── chat/                        # 流式对话端点（含系统提示词）
+│   ├── rag/                         # RAG 知识库问答（含系统提示词）
+│   ├── tools/                       # Function Calling（含投资工具）
+│   │   └── service/
+│   │       ├── StockPriceToolService.java   # 股价查询工具（新增）
+│   │       ├── MarketIndexToolService.java  # 市场指标工具（新增）
+│   │       └── RiskCalculatorToolService.java # 风险计算工具（新增）
+│   ├── skills/                      # Skills 框架（新增）
+│   │   ├── controller/
+│   │   │   └── SkillsAgentController.java
+│   │   ├── service/
+│   │   │   └── SkillsAgentService.java
+│   │   └── config/
+│   │       └── SkillsAgentConfig.java
 │   ├── graph/                       # Graph 工作流
 │   └── observability/               # OTel + Langfuse 配置
 ├── src/main/resources/
 │   ├── application.yml              # 主配置
 │   ├── application-cloud.yml        # Langfuse 云端配置
 │   ├── application-local.yml        # Langfuse 本地配置
-│   └── docs/                        # RAG 示例文档
+│   ├── docs/                        # RAG 示例文档
+│   └── skills/                      # 技能定义目录（新增）
+│       ├── market-analysis/
+│       │   └── SKILL.md
+│       ├── risk-assessment/
+│       │   └── SKILL.md
+│       ├── portfolio-optimization/
+│       │   └── SKILL.md
+│       ├── investment-recommendation/
+│       │   └── SKILL.md
+│       ├── weather-assistant/
+│       │   └── SKILL.md
+│       ├── java-spring-expert/
+│       │   └── SKILL.md
+│       └── code-reviewer/
+│           └── SKILL.md
 └── src/test/                        # 测试代码
+    └── java/com/zhou/ai/
+        ├── ApplicationIntegrationTest.java  # 主流程冒烟测试（新增）
+        └── skills/
+            ├── SkillsAgentIntegrationTest.java
+            └── SkillsAgentServiceTest.java
 ```

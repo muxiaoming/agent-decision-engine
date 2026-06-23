@@ -254,6 +254,144 @@ RAG 问答流式版本。
 
 ---
 
+## 9. Skills Agent 接口（新增）
+
+### POST /api/skills/chat
+
+Skills Agent 对话接口，支持技能选择和多轮对话。
+
+**请求体**:
+```json
+{
+  "message": "分析一下A股市场",
+  "threadId": "optional-thread-id"
+}
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| message | String | 是 | 用户消息内容 |
+| threadId | String | 否 | 对话会话标识，用于多轮对话 |
+
+**响应体（200）**:
+```json
+{
+  "reply": "根据市场分析技能，A股市场当前呈现...",
+  "threadId": "thread-abc123",
+  "durationMs": 2500
+}
+```
+
+**技能选择示例**:
+- "分析一下A股市场" → 加载 market-analysis 技能
+- "帮我评估投资风险" → 加载 risk-assessment 技能
+- "怎么配置投资组合" → 加载 portfolio-optimization 技能
+- "推荐一些股票" → 加载 investment-recommendation 技能
+- "北京天气怎么样" → 加载 weather-assistant 技能
+
+### GET /api/skills
+
+列出所有可用技能。
+
+**响应体（200）**:
+```json
+{
+  "registryType": "Classpath",
+  "skillCount": 7,
+  "skills": {
+    "market-analysis": "市场分析技能。当用户询问市场趋势、大盘走势、行业分析、市场情绪等问题时使用此技能。",
+    "risk-assessment": "风险评估技能。当用户询问投资风险、VaR 计算、风险控制等问题时使用此技能。",
+    "portfolio-optimization": "投资组合优化技能。当用户询问资产配置、组合优化、再平衡等问题时使用此技能。",
+    "investment-recommendation": "投资推荐技能。当用户询问投资建议、买什么股票、投资策略等问题时使用此技能。",
+    "weather-assistant": "天气查询助手。当用户询问天气、气温、穿衣建议、出行建议等天气相关问题时使用此技能。",
+    "java-spring-expert": "Java/Spring 专家。当用户询问 Java 或 Spring 相关技术问题时使用此技能。",
+    "code-reviewer": "代码审查助手。当用户提交代码需要审查时使用此技能。"
+  },
+  "explanation": "Skills 使用渐进式披露：系统提示仅包含技能名称和描述，Agent 按需调用 read_skill(name) 加载完整内容"
+}
+```
+
+---
+
+## 10. 投资工具接口（新增）
+
+### POST /api/tools/chat（增强）
+
+带投资工具调用的对话接口。
+
+**请求体**:
+```json
+{
+  "message": "查询苹果公司的股价",
+  "modelName": "deepSeekChatModel"
+}
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| message | String | 是 | 用户消息内容 |
+| modelName | String | 否 | 模型名称，默认 deepSeekChatModel |
+
+**响应体（200）**:
+```json
+{
+  "content": "苹果公司（AAPL）当前股价为 178.52 美元，较昨日上涨 2.35 美元，涨幅 1.33%。",
+  "model": "deepSeekChatModel",
+  "tokenUsage": {
+    "promptTokens": 150,
+    "completionTokens": 85,
+    "totalTokens": 235
+  }
+}
+```
+
+**投资工具调用示例**:
+
+#### 股价查询
+```bash
+curl -X POST http://localhost:8080/api/tools/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "查询苹果公司的股价"}'
+```
+
+#### 市场指数查询
+```bash
+curl -X POST http://localhost:8080/api/tools/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "查询上证指数"}'
+```
+
+#### 风险计算
+```bash
+curl -X POST http://localhost:8080/api/tools/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "帮我计算60%股票、30%债券、10%现金的组合收益"}'
+```
+
+#### VaR 计算
+```bash
+curl -X POST http://localhost:8080/api/tools/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "我投资了10万元，帮我计算95%置信水平下30天的VaR"}'
+```
+
+**投资工具列表**:
+
+| 工具名称 | 功能 | 使用场景 |
+|---------|------|---------|
+| getStockPrice | 查询股票实时价格 | 用户询问股票价格 |
+| getStockHistory | 查询股票历史价格 | 用户询问历史走势 |
+| calculateReturn | 计算投资收益率 | 用户计算收益 |
+| getMarketIndex | 查询大盘指数 | 用户询问大盘情况 |
+| getMarketVolatility | 查询市场波动率 | 用户询问市场风险 |
+| getMarketSentiment | 查询市场情绪 | 用户询问市场情绪 |
+| getSectorPerformance | 查询行业板块 | 用户询问行业表现 |
+| calculatePortfolioReturn | 计算投资组合收益 | 用户配置投资组合 |
+| calculateValueAtRisk | 计算 VaR | 用户评估风险 |
+| calculateSharpeRatio | 计算夏普比率 | 用户评估风险调整收益 |
+
+---
+
 ## 错误码约定
 
 | HTTP 状态码 | 说明 |

@@ -162,6 +162,127 @@
 
 ---
 
+## Phase 10: Skills 框架模块（新增）
+
+**Goal**: 实现 Skills 框架，支持模块化技能注册和渐进式披露
+
+**Independent Test**: 验证 7 个技能已注册，Agent 能根据用户意图选择合适的技能
+
+### Implementation for Skills Framework
+
+- [x] T044 实现 SkillsAgentConfig 配置类，配置 SkillRegistry、SkillsAgentHook、ReactAgent 在 `src/main/java/com/zhou/ai/skills/config/SkillsAgentConfig.java`
+- [x] T045 实现 SkillsAgentService 服务层，在 `src/main/java/com/zhou/ai/skills/service/SkillsAgentService.java`
+- [x] T046 实现 SkillsAgentController 端点 `POST /api/skills/chat` 和 `GET /api/skills` 在 `src/main/java/com/zhou/ai/skills/controller/SkillsAgentController.java`
+
+### Skill Definitions
+
+- [x] T047 创建 market-analysis 技能定义在 `src/main/resources/skills/market-analysis/SKILL.md`
+- [x] T048 创建 risk-assessment 技能定义在 `src/main/resources/skills/risk-assessment/SKILL.md`
+- [x] T049 创建 portfolio-optimization 技能定义在 `src/main/resources/skills/portfolio-optimization/SKILL.md`
+- [x] T050 创建 investment-recommendation 技能定义在 `src/main/resources/skills/investment-recommendation/SKILL.md`
+- [x] T051 创建 weather-assistant 技能定义在 `src/main/resources/skills/weather-assistant/SKILL.md`
+- [x] T052 创建 java-spring-expert 技能定义在 `src/main/resources/skills/java-spring-expert/SKILL.md`
+- [x] T053 创建 code-reviewer 技能定义在 `src/main/resources/skills/code-reviewer/SKILL.md`
+
+### Tests for Skills Framework
+
+- [x] T054 创建 SkillsAgentServiceTest 单元测试在 `src/test/java/com/zhou/ai/skills/SkillsAgentServiceTest.java`
+- [x] T055 创建 SkillsAgentIntegrationTest 集成测试在 `src/test/java/com/zhou/ai/skills/SkillsAgentIntegrationTest.java`
+
+**Checkpoint**: Skills 框架完成 — 7 个技能已注册，Agent 可选择合适技能
+
+---
+
+## Phase 11: 投资工具模块（新增）
+
+**Goal**: 实现投资相关工具，支持股价查询、市场指标、风险计算
+
+**Independent Test**: 验证投资工具能正确返回模拟数据，工具调用成功率 ≥ 90%
+
+### Implementation for Investment Tools
+
+- [x] T056 [P] 实现 StockPriceToolService 股价查询工具在 `src/main/java/com/zhou/ai/tools/service/StockPriceToolService.java`
+- [x] T057 [P] 实现 MarketIndexToolService 市场指标工具在 `src/main/java/com/zhou/ai/tools/service/MarketIndexToolService.java`
+- [x] T058 [P] 实现 RiskCalculatorToolService 风险计算工具在 `src/main/java/com/zhou/ai/tools/service/RiskCalculatorToolService.java`
+- [x] T059 更新 ToolCallbackConfig 注册新投资工具在 `src/main/java/com/zhou/ai/tools/config/ToolCallbackConfig.java`
+
+### Tests for Investment Tools
+
+- [x] T060 创建 StockPriceToolServiceTest 单元测试在 `src/test/java/com/zhou/ai/tools/StockPriceToolServiceTest.java`
+- [x] T061 创建 MarketIndexToolServiceTest 单元测试在 `src/test/java/com/zhou/ai/tools/MarketIndexToolServiceTest.java`
+- [x] T062 创建 RiskCalculatorToolServiceTest 单元测试在 `src/test/java/com/zhou/ai/tools/RiskCalculatorToolServiceTest.java`
+
+**Checkpoint**: 投资工具完成 — 股价、市场指标、风险计算工具可独立测试
+
+---
+
+## Phase 12: 系统提示词模块（新增）
+
+**Goal**: 为所有 AI 服务配置系统提示词，定义投资顾问角色和行为
+
+**Independent Test**: 验证 AI 助手按照系统提示词的角色定位回答问题
+
+### Implementation for System Prompts
+
+- [x] T063 为 ChatService 添加系统提示词（投资顾问助手角色）在 `src/main/java/com/zhou/ai/chat/service/ChatService.java`
+- [x] T064 为 RagService 添加系统提示词（投资知识库助手角色）在 `src/main/java/com/zhou/ai/rag/service/RagService.java`
+- [x] T065 为 ToolChatService 添加系统提示词（投资工具使用指南）在 `src/main/java/com/zhou/ai/tools/service/ToolChatService.java`
+- [x] T066 更新 SkillsAgentConfig 系统提示词（技能选择和工具使用指南）在 `src/main/java/com/zhou/ai/skills/config/SkillsAgentConfig.java`
+
+### Tests for System Prompts
+
+- [x] T067 创建系统提示词验证测试在 `src/test/java/com/zhou/ai/SystemPromptTest.java`
+
+**Checkpoint**: 系统提示词完成 — 所有 AI 服务有统一的投资顾问角色定位
+
+---
+
+## Phase 13: 主流程测试（新增）
+
+**Goal**: 实现端到端冒烟测试，串联所有核心功能
+
+**Independent Test**: 运行测试验证系统整体工作流程，测试时间 ≤ 120 秒
+
+### Implementation for Smoke Test
+
+- [x] T068 创建 ApplicationIntegrationTest 测试类在 `src/test/java/com/zhou/ai/ApplicationIntegrationTest.java`
+- [x] T069 实现 Skills 注册验证测试（验证 7 个技能已注册）
+- [x] T070 实现 Observability 健康检查测试
+- [x] T071 实现 RAG 文档摄入测试
+- [x] T072 实现 RAG 问答测试
+- [x] T073 实现 Tools 投资工具调用测试（股价、市场指标、风险计算）
+- [x] T074 实现 Skills Agent 对话测试
+- [x] T075 实现 Graph 工作流执行测试
+- [x] T076 实现多轮对话上下文保持测试
+
+**Checkpoint**: 主流程测试完成 — 端到端流程验证通过
+
+---
+
+## Phase 14: 优化和完善（更新）
+
+**Purpose**: 代码优化、文档完善和部署准备
+
+### Code Optimization
+
+- [ ] T077 优化系统提示词，确保投资风险声明一致
+- [ ] T078 添加 API 文档注解（Swagger/OpenAPI）
+- [ ] T079 优化错误处理和异常信息
+
+### Documentation
+
+- [ ] T080 更新 README.md 项目说明文档
+- [ ] T081 更新 quickstart.md 快速启动指南
+- [ ] T082 创建 API 接口文档（Swagger UI）
+
+### Deployment
+
+- [ ] T083 配置 application-cloud.yml 云端部署配置
+- [ ] T084 配置 application-local.yml 本地部署配置
+- [ ] T085 验证 Docker Compose 部署
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -172,7 +293,11 @@
   - US1 和 US2 共享 ChatService，US2 依赖 US1 的 ChatService
   - US3 (RAG)、US4 (Function Calling)、US5 (Graph) 互不依赖，可并行
   - US6 (Observability) 为横切关注点，可与其他故事并行
-- **Phase 9 (Polish)**: 依赖所有用户故事完成
+- **Phase 10 (Skills Framework)**: 依赖 Phase 2 和 Phase 4 (US4) 完成
+- **Phase 11 (Investment Tools)**: 依赖 Phase 2 和 Phase 4 (US4) 完成
+- **Phase 12 (System Prompts)**: 依赖 Phase 3-8 完成
+- **Phase 13 (Smoke Test)**: 依赖所有功能模块完成
+- **Phase 14 (Polish)**: 依赖所有用户故事完成
 
 ### User Story Dependencies
 
@@ -182,6 +307,10 @@
 - **US4 (P2 Function Calling)**: Phase 2 完成后可开始 — 独立于 US1/US2
 - **US5 (P3 Graph)**: Phase 2 完成后可开始 — 独立于其他故事
 - **US6 (P3 Observability)**: Phase 2 完成后可开始 — 横切关注点，可与其他故事并行
+- **Skills Framework**: 依赖 US4 (Function Calling) 完成
+- **Investment Tools**: 依赖 US4 (Function Calling) 完成
+- **System Prompts**: 依赖所有功能模块完成
+- **Smoke Test**: 依赖所有功能模块完成
 
 ### Within Each User Story
 
@@ -201,6 +330,14 @@ Phase 2 完成后:
 
 顺序组（共享 ChatService）:
   US1 (T014-T016) → US2 (T017-T020)
+
+US4 完成后:
+  ├── Skills Framework (T044-T055)
+  └── Investment Tools (T056-T062)
+
+所有功能模块完成后:
+  ├── System Prompts (T063-T067)
+  └── Smoke Test (T068-T076)
 ```
 
 ---
@@ -237,7 +374,11 @@ Task: "实现 DocumentIngestionService" → "实现 RagService" → "实现 RagC
 5. + US4 → Function Calling
 6. + US5 → Graph 工作流
 7. + US6 → Langfuse 全链路可观测
-8. Polish → 部署文件、验证、清理
+8. + Skills Framework → 技能注册和渐进式披露
+9. + Investment Tools → 投资工具
+10. + System Prompts → 系统提示词
+11. + Smoke Test → 主流程测试
+12. Polish → 部署文件、验证、清理
 
 ### Parallel Team Strategy
 
@@ -247,8 +388,47 @@ Task: "实现 DocumentIngestionService" → "实现 RagService" → "实现 RagC
 2. Phase 2 完成后:
    - 开发者 A: US1 → US2（顺序，共享 ChatService）
    - 开发者 B: US3 (RAG)
-   - 开发者 C: US4 (Function Calling)
+   - 开发者 C: US4 (Function Calling) → Skills Framework + Investment Tools
    - 开发者 D: US5 (Graph) + US6 (Observability)
+3. 所有功能模块完成后:
+   - 开发者 E: System Prompts + Smoke Test
+
+---
+
+## Task Statistics
+
+| Phase | Task Count | User Story |
+|-------|-----------|------------|
+| Phase 1: Setup | 5 | - |
+| Phase 2: Foundational | 8 | - |
+| Phase 3: US1 Multi-model | 3 | US1 |
+| Phase 4: US2 Streaming | 4 | US2 |
+| Phase 5: US3 RAG | 6 | US3 |
+| Phase 6: US4 Function Calling | 5 | US4 |
+| Phase 7: US5 Graph | 4 | US5 |
+| Phase 8: US6 Observability | 5 | US6 |
+| Phase 9: Polish | 3 | - |
+| Phase 10: Skills Framework | 12 | 新增 |
+| Phase 11: Investment Tools | 7 | 新增 |
+| Phase 12: System Prompts | 5 | 新增 |
+| Phase 13: Smoke Test | 9 | 新增 |
+| Phase 14: Optimization | 9 | - |
+| **Total** | **85** | - |
+
+### By User Story
+
+| User Story | Tasks | Priority | Status |
+|-----------|-------|----------|--------|
+| US1: Multi-model Chat | 3 | P1 | ✅ Completed |
+| US2: Streaming | 4 | P1 | ✅ Completed |
+| US3: RAG | 6 | P2 | ✅ Completed |
+| US4: Function Calling | 5 | P2 | ✅ Completed |
+| US5: Graph | 4 | P3 | ✅ Completed |
+| US6: Observability | 5 | P3 | ✅ Completed |
+| Skills Framework | 12 | New | ⏳ Pending |
+| Investment Tools | 7 | New | ⏳ Pending |
+| System Prompts | 5 | New | ⏳ Pending |
+| Smoke Test | 9 | New | ⏳ Pending |
 
 ---
 

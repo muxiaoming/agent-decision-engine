@@ -86,6 +86,73 @@ OpenAI 兼容模式接入。
 **备选方案**:
 - `FunctionToolCallback` 显式注册：更精确的控制，可在后续升级。
 - `@Tool` 注解方式：更简洁但灵活性稍低。
+- 使用外部 API：增加网络依赖，不适合演示。
+
+---
+
+## 研究主题 8：Skills 框架集成
+
+**决策**: 使用 Spring AI Alibaba 的 Skills 框架，通过 ClasspathSkillRegistry 自动发现技能。
+
+**理由**:
+- Spring AI Alibaba 1.1.2+ 原生支持 Skills 框架
+- ClasspathSkillRegistry 自动扫描 `skills/` 目录下的 SKILL.md 文件
+- SkillsAgentHook 支持渐进式披露，系统提示词仅加载技能摘要
+- ReactAgent 集成，支持多轮对话和工具调用
+
+**备选方案**:
+- 手动注册技能：灵活性高但维护成本大
+- 使用外部配置文件：增加配置复杂度
+
+---
+
+## 研究主题 9：投资工具设计
+
+**决策**: 使用 `@Tool` 注解定义投资工具，通过 `MethodToolCallbackProvider` 自动注册。
+
+**理由**:
+- Spring AI 的 `@Tool` 注解是标准的工具定义方式
+- `MethodToolCallbackProvider` 自动扫描所有 `@Tool` 方法并注册
+- 工具实现为独立的 `@Component`，便于测试和替换
+- 投资工具提供模拟数据，支持离线测试和演示
+
+**备选方案**:
+- 使用 `Function<Request, Response>` Bean：更灵活但代码量更大
+- 使用外部 API：增加网络依赖，不适合演示
+
+---
+
+## 研究主题 10：系统提示词管理
+
+**决策**: 将系统提示词作为常量定义在各 Service 类中，通过 `.system()` 方法注入。
+
+**理由**:
+- 简单直接，易于理解和维护
+- 每个服务的提示词独立管理，职责清晰
+- 通过 Git 版本控制追踪变更
+- 与 Spring AI 的 ChatClient API 无缝集成
+
+**备选方案**:
+- 外部配置文件：增加配置复杂度
+- Langfuse Prompt 管理：增加外部依赖
+- 数据库存储：过度设计
+
+---
+
+## 研究主题 11：主流程测试设计
+
+**决策**: 创建 `ApplicationIntegrationTest` 类，串联所有核心功能进行端到端测试。
+
+**理由**:
+- 验证系统整体工作流程，而非单个功能
+- 使用 `@SpringBootTest` 启动完整应用，模拟真实环境
+- 使用 `TestRestTemplate` 进行 HTTP 调用，测试 API 端点
+- 使用 `Assumptions` 在外部 API 不可用时优雅跳过
+
+**备选方案**:
+- 单元测试：无法验证端到端流程
+- 手动测试：效率低，不可重复
+- UI 自动化测试：过度设计，本项目无前端
 
 ---
 

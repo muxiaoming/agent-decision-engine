@@ -135,3 +135,117 @@ AiModelConfig (3 instances)
 - `KnowledgeDocument` 管理 RAG 文档的摄入生命周期
 - `ToolDefinition` 描述 Function Calling 的工具元数据
 - `TraceRecord` 是 Langfuse 中追踪数据的客户端视图
+
+---
+
+### 8. SkillMetadata — 技能元数据
+
+代表一个注册到 SkillRegistry 的技能。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| name | String | 技能名称（如 market-analysis） |
+| description | String | 技能描述 |
+| content | String | 技能完整内容（SKILL.md） |
+| path | String | 技能文件路径 |
+
+**来源**: ClasspathSkillRegistry 自动扫描 `skills/` 目录
+
+**验证规则**:
+- `name` 不得为空，必须符合 kebab-case 格式
+- `description` 不得为空
+- `content` 必须包含有效的 Markdown 内容
+
+**已注册技能**:
+- `market-analysis` - 市场分析技能
+- `risk-assessment` - 风险评估技能
+- `portfolio-optimization` - 投资组合优化技能
+- `investment-recommendation` - 投资推荐技能
+- `weather-assistant` - 天气助手技能
+- `java-spring-expert` - Java/Spring 专家技能
+- `code-reviewer` - 代码审查技能
+
+---
+
+### 9. InvestmentToolResult — 投资工具结果
+
+代表投资工具调用的返回结果。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| toolName | String | 工具名称 |
+| symbol | String | 股票代码/指数名称（可选） |
+| data | Map<String, Object> | 工具返回的数据 |
+| timestamp | long | 调用时间戳 |
+
+**工具列表**:
+- `getStockPrice` - 股价查询
+- `getStockHistory` - 历史价格查询
+- `calculateReturn` - 收益率计算
+- `getMarketIndex` - 市场指数查询
+- `getMarketVolatility` - 波动率查询
+- `getMarketSentiment` - 市场情绪查询
+- `getSectorPerformance` - 行业板块查询
+- `calculatePortfolioReturn` - 投资组合收益计算
+- `calculateValueAtRisk` - VaR 计算
+- `calculateSharpeRatio` - 夏普比率计算
+
+---
+
+### 10. SystemPrompt — 系统提示词
+
+代表 AI 助手的角色和行为定义。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| service | String | 服务名称（ChatService/RagService 等） |
+| role | String | 角色定位（投资顾问/知识库助手等） |
+| instructions | String | 行为指南和约束 |
+
+**已定义提示词**:
+- `ChatService` - 智能投资顾问助手
+- `RagService` - 投资知识库助手
+- `ToolChatService` - 投资工具使用指南
+- `SkillsAgent` - 技能选择和工具使用指南
+
+---
+
+## 实体关系（更新）
+
+```
+AiModelConfig (3 instances)
+    │
+    ├── ChatRequest ──→ ChatResponse
+    │                       └── TokenUsage
+    │
+    ├── KnowledgeDocument ──→ VectorStore (SimpleVectorStore)
+    │
+    ├── ToolDefinition ──→ @Tool Bean
+    │   ├── WeatherToolService
+    │   ├── CalculatorToolService
+    │   ├── StockPriceToolService (新增)
+    │   ├── MarketIndexToolService (新增)
+    │   └── RiskCalculatorToolService (新增)
+    │
+    ├── SkillMetadata ──→ ClasspathSkillRegistry (新增)
+    │   ├── market-analysis
+    │   ├── risk-assessment
+    │   ├── portfolio-optimization
+    │   ├── investment-recommendation
+    │   ├── weather-assistant
+    │   ├── java-spring-expert
+    │   └── code-reviewer
+    │
+    ├── SystemPrompt ──→ 各 Service 类 (新增)
+    │
+    └── TraceRecord (Langfuse, 只读)
+```
+
+**说明**:
+- `AiModelConfig` 是所有功能的配置基础
+- `ChatRequest`/`ChatResponse` 是对话流的核心数据对象
+- `KnowledgeDocument` 管理 RAG 文档的摄入生命周期
+- `ToolDefinition` 描述 Function Calling 的工具元数据（新增投资工具）
+- `SkillMetadata` 描述 Skills 框架的技能元数据（新增）
+- `SystemPrompt` 定义 AI 助手的角色和行为（新增）
+- `TraceRecord` 是 Langfuse 中追踪数据的客户端视图
