@@ -26,13 +26,17 @@ class SkillsAgentIntegrationTest {
 
     @Test
     @Order(1)
-    @DisplayName("listSkills - 应注册 3 个技能（classpath 扫描）")
+    @DisplayName("listSkills - 应注册 7 个技能（classpath 扫描）")
     void shouldRegisterThreeSkills() {
         Map<String, String> skills = skillsAgentService.listSkills();
 
-        assertEquals(3, skills.size(), "应有 3 个技能");
-        assertTrue(skills.containsKey("java-spring-expert"));
+        assertEquals(7, skills.size(), "应有 7 个技能");
+        assertTrue(skills.containsKey("market-analysis"));
+        assertTrue(skills.containsKey("risk-assessment"));
+        assertTrue(skills.containsKey("portfolio-optimization"));
+        assertTrue(skills.containsKey("investment-recommendation"));
         assertTrue(skills.containsKey("weather-assistant"));
+        assertTrue(skills.containsKey("java-spring-expert"));
         assertTrue(skills.containsKey("code-reviewer"));
         System.out.println("已注册技能: " + skills.keySet());
     }
@@ -44,7 +48,7 @@ class SkillsAgentIntegrationTest {
         Map<String, Object> diag = skillsAgentService.getDiagnostics();
 
         assertEquals("Classpath", diag.get("registryType"));
-        assertEquals(3, diag.get("skillCount"));
+        assertEquals(7, diag.get("skillCount"));
         assertNotNull(diag.get("explanation"));
         System.out.println("诊断信息: " + diag);
     }

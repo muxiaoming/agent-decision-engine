@@ -1,5 +1,6 @@
 package com.zhou.ai.skills.config;
 
+import com.alibaba.cloud.ai.graph.CompileConfig;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.agent.hook.skills.SkillsAgentHook;
 import com.alibaba.cloud.ai.graph.skills.registry.SkillRegistry;
@@ -36,6 +37,13 @@ public class SkillsAgentConfig {
                 .build();
     }
 
+    /**
+     * Agent 最大推理轮次。
+     * 每轮 = 一次 LLM 调用 + tool 执行。超过此限制 Agent 停止循环。
+     * 过大会导致上下文膨胀和 API 超时，过小可能回答不完整。
+     */
+    private static final int MAX_AGENT_ROUNDS = 8;
+
     @Bean
     public ReactAgent skillsAgent(
             @Qualifier("deepSeekChatModel") ChatModel chatModel,
@@ -43,13 +51,27 @@ public class SkillsAgentConfig {
             WeatherToolService weatherToolService,
             CalculatorToolService calculatorToolService) {
 
+        CompileConfig compileConfig = CompileConfig.builder()
+                .recursionLimit(MAX_AGENT_ROUNDS * 2)  // 每轮 = llm节点 + tool节点，框架按节点计数而非轮次
+                .build();
+
         return ReactAgent.builder()
                 .name("skills-agent")
                 .model(chatModel)
-                .instruction("你是一个智能助手，拥有多种技能（Skills）。"
-                        + "根据用户的问题，先判断是否需要加载某个技能，"
-                        + "如果需要，使用 read_skill 工具获取完整技能内容后再回答。"
-                        + "你也可以使用 queryWeather 和 calculate 工具来辅助回答。")
+                .compileConfig(compileConfig)
+                .instruction("你是一个智能投资顾问助手。\n\n"
+                        + "## 可用技能\n"
+                        + "- market-analysis：市场分析\n"
+                        + "- risk-assessment：风险评估\n"
+                        + "- portfolio-optimization：投资组合优化\n"
+                        + "- investment-recommendation：投资推荐\n"
+                        + "- weather-assistant：天气查询\n\n"
+                        + "## 规则\n"
+                        + "1. 每次调用最多加载1-2个最相关的技能，不要加载全部\n"
+                        + "2. 如果已经加载过某个技能，不要重复加载\n"
+                        + "3. 使用 calculate 工具完成数学计算\n"
+                        + "4. 直接回答用户问题，不要问用户补充信息\n"
+                        + "5. 投资有风险，建议仅供参考")
                 .methodTools(weatherToolService, calculatorToolService)
                 .hooks(List.of(skillsAgentHook))
                 .enableLogging(true)
