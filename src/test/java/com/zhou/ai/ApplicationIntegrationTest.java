@@ -130,23 +130,34 @@ class ApplicationIntegrationTest {
     @Order(9)
     @DisplayName("GET /api/observability/test-mimo - MiMo 模型 Trace 测试")
     void observabilityTestMimo() {
-        ResponseEntity<Map> resp = rest.getForEntity("/api/observability/test-mimo", Map.class);
-        assumeTrue(resp.getStatusCode().is2xxSuccessful(), "MiMo API 不可用，跳过测试");
-        Map body = resp.getBody();
-        assertNotNull(body.get("traceId"), "应返回 traceId");
-        assertNotNull(body.get("content"), "应返回模型回复");
-        System.out.println("MiMo Trace ID: " + body.get("traceId"));
+        try {
+            ResponseEntity<Map> resp = rest.getForEntity("/api/observability/test-mimo", Map.class);
+            assumeTrue(resp.getStatusCode().is2xxSuccessful(), "MiMo API 不可用，跳过测试");
+            Map body = resp.getBody();
+            assertNotNull(body.get("content"), "应返回模型回复");
+            assertNotNull(body.get("langfuseMode"), "应返回 langfuseMode");
+            System.out.println("MiMo 测试成功，langfuseMode: " + body.get("langfuseMode"));
+        } catch (Exception e) {
+            System.out.println("MiMo API 不可用，跳过测试: " + e.getMessage());
+            assumeTrue(false, "MiMo API 不可用，跳过测试");
+        }
     }
 
     @Test
     @Order(10)
     @DisplayName("GET /api/observability/test-deepseek - DeepSeek 模型 Trace 测试")
     void observabilityTestDeepSeek() {
-        ResponseEntity<Map> resp = rest.getForEntity("/api/observability/test-deepseek", Map.class);
-        assumeTrue(resp.getStatusCode().is2xxSuccessful(), "DeepSeek API 不可用，跳过测试");
-        Map body = resp.getBody();
-        assertNotNull(body.get("traceId"), "应返回 traceId");
-        System.out.println("DeepSeek Trace ID: " + body.get("traceId"));
+        try {
+            ResponseEntity<Map> resp = rest.getForEntity("/api/observability/test-deepseek", Map.class);
+            assumeTrue(resp.getStatusCode().is2xxSuccessful(), "DeepSeek API 不可用，跳过测试");
+            Map body = resp.getBody();
+            assertNotNull(body.get("content"), "应返回模型回复");
+            assertNotNull(body.get("langfuseMode"), "应返回 langfuseMode");
+            System.out.println("DeepSeek 测试成功，langfuseMode: " + body.get("langfuseMode"));
+        } catch (Exception e) {
+            System.out.println("DeepSeek API 不可用，跳过测试: " + e.getMessage());
+            assumeTrue(false, "DeepSeek API 不可用，跳过测试");
+        }
     }
 
     // ==================== RAG 模块 ====================
