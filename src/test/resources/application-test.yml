@@ -1,0 +1,36 @@
+spring:
+  profiles:
+    active: test
+  ai:
+    deepseek:
+      api-key: test-key
+      chat:
+        model: test-model
+    openai:
+      api-key: test-key
+      chat:
+        options:
+          model: test-model
+    dashscope:
+      api-key: test-key
+      chat:
+        options:
+          model: test-model
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.actuate.autoconfigure.opentelemetry.OpenTelemetryAutoConfiguration
+      - io.opentelemetry.instrumentation.spring.webmvc.SpringWebMvcTelemetryAutoConfiguration
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  observations:
+    annotations:
+      enabled: false
+
+logging:
+  level:
+    com.zhou.ai: INFO
+    org.springframework.ai: WARN
