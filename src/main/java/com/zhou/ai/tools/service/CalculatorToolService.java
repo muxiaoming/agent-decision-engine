@@ -26,7 +26,15 @@ public class CalculatorToolService {
      * 简单的数学表达式求值器（支持 +, -, *, /, 括号）。
      */
     private double evaluateExpression(String expression) {
-        String sanitized = expression.replaceAll("[^0-9+\\-*/().\\s]", "");
+        // 先替换常见的 Unicode 运算符为 ASCII
+        String normalized = expression
+                .replace('×', '*')
+                .replace('÷', '/')
+                .replace('∗', '*')
+                .replace(' ', ' ')  // non-breaking space
+                .trim();
+        // 只保留数字、运算符、括号、小数点和空格
+        String sanitized = normalized.replaceAll("[^0-9+\\-*/().\\s]", "");
         return new ExpressionParser(sanitized).parse();
     }
 
@@ -55,6 +63,8 @@ public class CalculatorToolService {
         double parse() {
             double result = parseTerm();
             while (pos < input.length()) {
+                skipWhitespace();
+                if (pos >= input.length()) break;
                 char c = input.charAt(pos);
                 if (c == '+') {
                     pos++;
@@ -72,6 +82,8 @@ public class CalculatorToolService {
         private double parseTerm() {
             double result = parseFactor();
             while (pos < input.length()) {
+                skipWhitespace();
+                if (pos >= input.length()) break;
                 char c = input.charAt(pos);
                 if (c == '*') {
                     pos++;

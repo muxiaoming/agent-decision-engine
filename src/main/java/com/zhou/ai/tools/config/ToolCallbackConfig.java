@@ -1,6 +1,9 @@
 package com.zhou.ai.tools.config;
 
 import com.zhou.ai.tools.service.CalculatorToolService;
+import com.zhou.ai.tools.service.MarketIndexToolService;
+import com.zhou.ai.tools.service.RiskCalculatorToolService;
+import com.zhou.ai.tools.service.StockPriceToolService;
 import com.zhou.ai.tools.service.WeatherToolService;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
@@ -18,9 +21,18 @@ public class ToolCallbackConfig {
     @Bean
     public ToolCallbackProvider toolCallbackProvider(
             WeatherToolService weatherToolService,
-            CalculatorToolService calculatorToolService) {
+            CalculatorToolService calculatorToolService,
+            StockPriceToolService stockPriceToolService,
+            MarketIndexToolService marketIndexToolService,
+            RiskCalculatorToolService riskCalculatorToolService) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(weatherToolService, calculatorToolService)
+                .toolObjects(
+                        weatherToolService,
+                        calculatorToolService,
+                        stockPriceToolService,
+                        marketIndexToolService,
+                        riskCalculatorToolService
+                )
                 .build();
     }
 }
