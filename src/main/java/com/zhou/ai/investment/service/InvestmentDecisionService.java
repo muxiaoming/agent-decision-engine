@@ -118,11 +118,39 @@ public class InvestmentDecisionService {
         TokenUsage totalTokenUsage = new TokenUsage(0, 0, 0);
 
         try {
-            // Step 1: 问题感知 (Skills)
+            // Step 1: 问题感知 (Skills) — 内置意图判断
             log.info("Step 1: 执行问题感知");
             WorkflowStep step1 = executeProblemPerception(request, threadId, contextBuilder);
             steps.add(step1);
             totalTokenUsage = accumulateTokenUsage(totalTokenUsage, step1.tokenUsage());
+
+            // 如果不是投资类消息（闲聊/打招呼），跳过后续步骤
+            boolean isNonInvestment = "对话回复".equals(step1.name());
+            if (isNonInvestment) {
+                log.info("非投资类消息，跳过后续决策步骤");
+
+                // 构建最终响应
+                long durationMs = System.currentTimeMillis() - startTime;
+                String finalAdvice = step1.result();
+
+                log.info("对话回复完成: 耗时={}ms", durationMs);
+
+                // 将 WorkflowStep 转换为 DecisionStep
+                List<DecisionStep> decisionSteps = steps.stream()
+                        .map(ws -> new DecisionStep(
+                                ws.step(),
+                                ws.name(),
+                                ws.module(),
+                                ws.status(),
+                                ws.result(),
+                                ws.error()
+                        ))
+                        .toList();
+
+                return InvestmentDecisionResponse.success(
+                        threadId, decisionSteps, finalAdvice, null,
+                        durationMs, totalTokenUsage, modelName);
+            }
 
             // Step 2: 知识检索 (RAG) - 条件执行
             if (workflowData.isRAGEnabled()) {
@@ -212,72 +240,100 @@ public class InvestmentDecisionService {
 
             StringBuilder contextBuilder = new StringBuilder();
 
-            return Flux.concat(
-                    // Step 1: 问题感知
+            // 构建 Step 1 的流
+            Flux<InvestmentStepEvent> step1Flux = Flux.concat(
                     Flux.just(InvestmentStepEvent.stepStart(1, "问题感知", "skills")),
                     executeStepStream(1, "问题感知", "skills",
                             buildProblemPerceptionPrompt(request.message()),
-                            threadId, contextBuilder, "【问题感知】\n"),
-
-                    // Step 2: 知识检索 (条件执行)
-                    workflowData.isRAGEnabled() ?
-                            Flux.concat(
-                                    Flux.just(InvestmentStepEvent.stepStart(2, "知识检索", "rag")),
-                                    executeStepStream(2, "知识检索", "rag",
-                                            buildKnowledgeRetrievalPrompt(request.message(), contextBuilder.toString()),
-                                            threadId, contextBuilder, "【知识检索】\n")
-                            ) : Flux.just(InvestmentStepEvent.stepStart(2, "知识检索", "rag"))
-                            .concatWith(Flux.defer(() -> {
-                                log.info("Step 2: 跳过知识检索 (RAG已禁用)");
-                                return Flux.just(InvestmentStepEvent.stepComplete(2, "知识检索", "rag", "RAG功能已禁用"));
-                            })),
-
-                    // Step 3: 数据获取 (条件执行)
-                    workflowData.isToolsEnabled() ?
-                            Flux.concat(
-                                    Flux.just(InvestmentStepEvent.stepStart(3, "数据获取", "tools")),
-                                    executeToolsStepStream(3, "数据获取", workflowData, contextBuilder)
-                            ) : Flux.just(InvestmentStepEvent.stepStart(3, "数据获取", "tools"))
-                            .concatWith(Flux.defer(() -> {
-                                log.info("Step 3: 跳过数据获取 (Tools已禁用)");
-                                return Flux.just(InvestmentStepEvent.stepComplete(3, "数据获取", "tools", "Tools功能已禁用"));
-                            })),
-
-                    // Step 4: 推理分析
-                    Flux.just(InvestmentStepEvent.stepStart(4, "推理分析", "skills")),
-                    executeStepStream(4, "推理分析", "skills",
-                            buildReasoningAnalysisPrompt(request.message(), contextBuilder.toString()),
-                            threadId, contextBuilder, "【推理分析】\n"),
-
-                    // Step 5: 决策生成
-                    Flux.just(InvestmentStepEvent.stepStart(5, "决策生成", "skills")),
-                    executeStepStream(5, "决策生成", "skills",
-                            buildDecisionGenerationPrompt(request.message(), contextBuilder.toString()),
-                            threadId, contextBuilder, "【决策生成】\n"),
-
-                    // Step 6: 流程编排 (条件执行)
-                    workflowData.isGraphEnabled() ?
-                            Flux.concat(
-                                    Flux.just(InvestmentStepEvent.stepStart(6, "流程编排", "graph")),
-                                    executeGraphStepStream(6, "流程编排", workflowData, contextBuilder)
-                            ) : Flux.just(InvestmentStepEvent.stepStart(6, "流程编排", "graph"))
-                            .concatWith(Flux.defer(() -> {
-                                log.info("Step 6: 跳过流程编排 (Graph已禁用)");
-                                return Flux.just(InvestmentStepEvent.stepComplete(6, "流程编排", "graph", "Graph功能已禁用"));
-                            })),
-
-                    // 决策完成事件
-                    Flux.defer(() -> {
-                        long durationMs = System.currentTimeMillis() - startTime;
-                        log.info("流式投资决策流程完成: 耗时={}ms", durationMs);
-                        return Flux.just(InvestmentStepEvent.decisionComplete(
-                                threadId,
-                                "投资决策已完成，请查看各步骤详情",
-                                RISK_WARNING_TEMPLATE,
-                                durationMs
-                        ));
-                    })
+                            threadId, contextBuilder, "【问题感知】\n")
             );
+
+            // 根据 Step 1 的结果动态决定后续步骤
+            return step1Flux.switchOnFirst((signal, flux) -> {
+                InvestmentStepEvent firstEvent = signal.get();
+                // 检查 Step 1 是否返回了非投资类回复（stepName 为 "对话回复"）
+                boolean isNonInvestment = firstEvent != null
+                        && "step_complete".equals(firstEvent.type())
+                        && "对话回复".equals(firstEvent.name());
+
+                if (isNonInvestment) {
+                    long durationMs = System.currentTimeMillis() - startTime;
+                    log.info("流式 Step 1 检测到非投资类消息，跳过后续步骤");
+                    return Flux.concat(
+                            flux,
+                            Flux.just(InvestmentStepEvent.decisionComplete(
+                                    threadId,
+                                    firstEvent.result(),
+                                    null,
+                                    durationMs
+                            ))
+                    );
+                }
+
+                // 投资类消息：继续后续步骤
+                return Flux.concat(
+                        flux,
+
+                        // Step 2: 知识检索 (条件执行)
+                        workflowData.isRAGEnabled() ?
+                                Flux.concat(
+                                        Flux.just(InvestmentStepEvent.stepStart(2, "知识检索", "rag")),
+                                        executeStepStream(2, "知识检索", "rag",
+                                                buildKnowledgeRetrievalPrompt(request.message(), contextBuilder.toString()),
+                                                threadId, contextBuilder, "【知识检索】\n")
+                                ) : Flux.just(InvestmentStepEvent.stepStart(2, "知识检索", "rag"))
+                                .concatWith(Flux.defer(() -> {
+                                    log.info("Step 2: 跳过知识检索 (RAG已禁用)");
+                                    return Flux.just(InvestmentStepEvent.stepComplete(2, "知识检索", "rag", "RAG功能已禁用"));
+                                })),
+
+                        // Step 3: 数据获取 (条件执行)
+                        workflowData.isToolsEnabled() ?
+                                Flux.concat(
+                                        Flux.just(InvestmentStepEvent.stepStart(3, "数据获取", "tools")),
+                                        executeToolsStepStream(3, "数据获取", workflowData, contextBuilder)
+                                ) : Flux.just(InvestmentStepEvent.stepStart(3, "数据获取", "tools"))
+                                .concatWith(Flux.defer(() -> {
+                                    log.info("Step 3: 跳过数据获取 (Tools已禁用)");
+                                    return Flux.just(InvestmentStepEvent.stepComplete(3, "数据获取", "tools", "Tools功能已禁用"));
+                                })),
+
+                        // Step 4: 推理分析
+                        Flux.just(InvestmentStepEvent.stepStart(4, "推理分析", "skills")),
+                        executeStepStream(4, "推理分析", "skills",
+                                buildReasoningAnalysisPrompt(request.message(), contextBuilder.toString()),
+                                threadId, contextBuilder, "【推理分析】\n"),
+
+                        // Step 5: 决策生成
+                        Flux.just(InvestmentStepEvent.stepStart(5, "决策生成", "skills")),
+                        executeStepStream(5, "决策生成", "skills",
+                                buildDecisionGenerationPrompt(request.message(), contextBuilder.toString()),
+                                threadId, contextBuilder, "【决策生成】\n"),
+
+                        // Step 6: 流程编排 (条件执行)
+                        workflowData.isGraphEnabled() ?
+                                Flux.concat(
+                                        Flux.just(InvestmentStepEvent.stepStart(6, "流程编排", "graph")),
+                                        executeGraphStepStream(6, "流程编排", workflowData, contextBuilder)
+                                ) : Flux.just(InvestmentStepEvent.stepStart(6, "流程编排", "graph"))
+                                .concatWith(Flux.defer(() -> {
+                                    log.info("Step 6: 跳过流程编排 (Graph已禁用)");
+                                    return Flux.just(InvestmentStepEvent.stepComplete(6, "流程编排", "graph", "Graph功能已禁用"));
+                                })),
+
+                        // 决策完成事件
+                        Flux.defer(() -> {
+                            long durationMs = System.currentTimeMillis() - startTime;
+                            log.info("流式投资决策流程完成: 耗时={}ms", durationMs);
+                            return Flux.just(InvestmentStepEvent.decisionComplete(
+                                    threadId,
+                                    "投资决策已完成，请查看各步骤详情",
+                                    RISK_WARNING_TEMPLATE,
+                                    durationMs
+                            ));
+                        })
+                );
+            });
         });
     }
 
@@ -298,6 +354,15 @@ public class InvestmentDecisionService {
                 log.warn("步骤 1 返回空结果");
                 return WorkflowStep.failed(1, "问题感知", "skills",
                         "步骤返回空结果", System.currentTimeMillis() - stepStart);
+            }
+
+            // 检测是否为非投资类消息（闲聊、打招呼等）
+            if (result.startsWith("NON_INVESTMENT:")) {
+                String chatReply = result.substring("NON_INVESTMENT:".length()).trim();
+                log.info("检测到非投资类消息，直接回复: {}", chatReply.length() > 50 ? chatReply.substring(0, 50) + "..." : chatReply);
+                contextBuilder.append("【对话回复】\n").append(chatReply).append("\n\n");
+                return WorkflowStep.success(1, "对话回复", "skills",
+                        chatReply, System.currentTimeMillis() - stepStart);
             }
 
             if (result.startsWith("Exception:") || result.contains("Error while extracting response")) {
@@ -380,6 +445,7 @@ public class InvestmentDecisionService {
 
         try {
             StringBuilder toolResultBuilder = new StringBuilder();
+            toolResultBuilder.append("> 注意：以下为模拟数据，仅供功能演示参考，不构成投资建议\n\n");
 
             // Tool 1: 股价查询
             long toolStart = System.currentTimeMillis();
@@ -387,7 +453,7 @@ public class InvestmentDecisionService {
             toolCalls.add(ToolCall.success("getStockPrice",
                     Map.of("symbol", "AAPL"), stockData,
                     System.currentTimeMillis() - toolStart));
-            toolResultBuilder.append("AAPL股价: ").append(stockData.get("price")).append("\n");
+            toolResultBuilder.append("AAPL股价: ").append(stockData.get("price")).append(" (模拟)\n");
 
             // Tool 2: 市场指数
             toolStart = System.currentTimeMillis();
@@ -395,7 +461,7 @@ public class InvestmentDecisionService {
             toolCalls.add(ToolCall.success("getMarketIndex",
                     Map.of("indexName", "上证指数"), indexData,
                     System.currentTimeMillis() - toolStart));
-            toolResultBuilder.append("上证指数: ").append(indexData.get("value")).append("\n");
+            toolResultBuilder.append("上证指数: ").append(indexData.get("value")).append(" (模拟)\n");
 
             // Tool 3: 风险计算
             toolStart = System.currentTimeMillis();
@@ -403,7 +469,7 @@ public class InvestmentDecisionService {
             toolCalls.add(ToolCall.success("calculateValueAtRisk",
                     Map.of("amount", 100000.0, "confidence", 0.95, "days", 30), riskData,
                     System.currentTimeMillis() - toolStart));
-            toolResultBuilder.append("VaR: ").append(riskData.get("var")).append("\n");
+            toolResultBuilder.append("VaR: ").append(riskData.get("var")).append(" (模拟)\n");
 
             String result = toolResultBuilder.toString();
 
@@ -577,6 +643,14 @@ public class InvestmentDecisionService {
                     return Flux.just(InvestmentStepEvent.stepError(stepNumber, stepName, skillName, "步骤返回空结果"));
                 }
 
+                // Step 1 意图检测：非投资类消息
+                if (stepNumber == 1 && result.startsWith("NON_INVESTMENT:")) {
+                    String chatReply = result.substring("NON_INVESTMENT:".length()).trim();
+                    log.info("流式 Step 1 检测到非投资类消息，直接回复");
+                    contextBuilder.append("【对话回复】\n").append(chatReply).append("\n\n");
+                    return Flux.just(InvestmentStepEvent.stepComplete(stepNumber, "对话回复", skillName, chatReply));
+                }
+
                 if (result.startsWith("Exception:") || result.contains("Error while extracting response")) {
                     log.warn("步骤 {} API调用失败，使用降级结果: {}", stepNumber,
                             result.length() > 100 ? result.substring(0, 100) : result);
@@ -674,6 +748,7 @@ public class InvestmentDecisionService {
 
             try {
                 StringBuilder toolResultBuilder = new StringBuilder();
+                toolResultBuilder.append("> 注意：以下为模拟数据，仅供功能演示参考，不构成投资建议\n\n");
 
                 // Tool 1: 股价查询
                 long toolStart = System.currentTimeMillis();
@@ -681,7 +756,7 @@ public class InvestmentDecisionService {
                 toolCalls.add(ToolCall.success("getStockPrice",
                         Map.of("symbol", "AAPL"), stockData,
                         System.currentTimeMillis() - toolStart));
-                toolResultBuilder.append("AAPL股价: ").append(stockData.get("price")).append("\n");
+                toolResultBuilder.append("AAPL股价: ").append(stockData.get("price")).append(" (模拟)\n");
 
                 // Tool 2: 市场指数
                 toolStart = System.currentTimeMillis();
@@ -689,7 +764,7 @@ public class InvestmentDecisionService {
                 toolCalls.add(ToolCall.success("getMarketIndex",
                         Map.of("indexName", "上证指数"), indexData,
                         System.currentTimeMillis() - toolStart));
-                toolResultBuilder.append("上证指数: ").append(indexData.get("value")).append("\n");
+                toolResultBuilder.append("上证指数: ").append(indexData.get("value")).append(" (模拟)\n");
 
                 // Tool 3: 风险计算
                 toolStart = System.currentTimeMillis();
@@ -697,7 +772,7 @@ public class InvestmentDecisionService {
                 toolCalls.add(ToolCall.success("calculateValueAtRisk",
                         Map.of("amount", 100000.0, "confidence", 0.95, "days", 30), riskData,
                         System.currentTimeMillis() - toolStart));
-                toolResultBuilder.append("VaR: ").append(riskData.get("var")).append("\n");
+                toolResultBuilder.append("VaR: ").append(riskData.get("var")).append(" (模拟)\n");
 
                 String result = toolResultBuilder.toString();
 
@@ -755,11 +830,15 @@ public class InvestmentDecisionService {
      */
     private String buildProblemPerceptionPrompt(String userMessage) {
         return """
+                请先判断用户输入是否为投资相关需求：
+
+                用户输入: %s
+
+                判断规则：
+                - 如果用户只是打招呼（如"你好"、"hi"）、闲聊、问与技术无关的问题，请回复"NON_INVESTMENT: "后跟自然的回应
+                - 如果用户提到投资、股票、基金、理财、资产配置、风险评估、市场分析等金融投资相关话题，请进行以下分析：
+
                 分析并理解以下用户投资需求：
-
-                用户需求: %s
-
-                请提取：
                 1. 投资目标（长期增值/短期收益/被动收入）
                 2. 预算范围
                 3. 风险承受能力（保守/中等/激进）
@@ -859,14 +938,17 @@ public class InvestmentDecisionService {
      * 从步骤结果中提取最终建议。
      */
     private String extractFinalAdvice(List<WorkflowStep> steps, StringBuilder contextBuilder) {
-        // 找到最后一个成功的步骤
-        for (int i = steps.size() - 1; i >= 0; i--) {
-            WorkflowStep step = steps.get(i);
-            if (step.isSuccessful() && step.result() != null) {
-                return step.result();
+        // 拼接所有成功步骤的结果，形成完整的投资建议
+        StringBuilder finalAdvice = new StringBuilder();
+        for (WorkflowStep step : steps) {
+            if (step.isSuccessful() && step.result() != null && !step.result().isEmpty()) {
+                if (finalAdvice.length() > 0) {
+                    finalAdvice.append("\n\n");
+                }
+                finalAdvice.append(step.result());
             }
         }
-        return "无法生成最终建议";
+        return finalAdvice.length() > 0 ? finalAdvice.toString() : "无法生成最终建议";
     }
 
     /**
