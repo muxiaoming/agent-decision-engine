@@ -30,7 +30,7 @@ class ModelRouterTest {
         // 构造桩 ChatModel
         Map<String, ChatModel> chatModels = new HashMap<>();
         chatModels.put("deepSeekChatModel", new StubChatModel("deepseek"));
-        chatModels.put("openAiChatModel", new StubChatModel("mimo"));
+        chatModels.put("openAiChatModel", new StubChatModel("agnes-ai"));
         chatModels.put("dashscopeChatModel", new StubChatModel("dashscope"));
 
         // 构造空的 ToolCallbackProvider
@@ -47,8 +47,8 @@ class ModelRouterTest {
     }
 
     @Test
-    @DisplayName("route - 正常路由到 MiMo 模型")
-    void routeMiMo() {
+    @DisplayName("route - 正常路由到 Agnes AI 模型")
+    void routeAgnes() {
         var client = modelRouter.route("openAiChatModel");
         assertNotNull(client, "路由到 openAiChatModel 应返回非 null ChatClient");
     }

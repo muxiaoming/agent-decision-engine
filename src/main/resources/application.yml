@@ -1,6 +1,6 @@
 spring:
   application:
-    name: springai-langfuse3-demo
+    name: agent-decision-engine
   profiles:
     active: local,dev
   autoconfigure:
@@ -18,11 +18,11 @@ spring:
         model: deepseek-chat
       base-url: https://api.deepseek.com
     openai:
-      api-key: ${MIMO_API_KEY:your-mimo-api-key}
-      base-url: https://token-plan-cn.xiaomimimo.com
+      api-key: ${AGNES_AI_API_KEY:your-agnes-ai-api-key}
+      base-url: https://apihub.agnes-ai.com/v1
       chat:
         options:
-          model: xiaomi/mimo-v2.5
+          model: agnes-2.0-flash
     dashscope:
       api-key: ${DASHSCOPE_API_KEY:your-dashscope-api-key}
       chat:
@@ -36,6 +36,11 @@ spring:
 
 server:
   port: 8182
+  servlet:
+    # API 路径前缀配置
+    # 所有 Controller 的路径都会自动添加此前缀
+    # 例如: @RequestMapping("/chat") -> 实际路径: /api/chat
+    context-path: /api
 
 # OpenTelemetry + Micrometer 观测配置（Langfuse 官方推荐）
 management:

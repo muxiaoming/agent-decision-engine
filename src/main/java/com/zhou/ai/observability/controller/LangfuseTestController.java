@@ -20,10 +20,10 @@ import java.util.Map;
  * HTTP span 自动作为根 span（由 opentelemetry-spring-boot-starter 创建）。
  */
 @RestController
-@RequestMapping("/api/observability")
+@RequestMapping("/observability")
 public class LangfuseTestController {
 
-    private static final String MIMO_MODEL = "openAiChatModel";
+    private static final String AGNES_MODEL = "openAiChatModel";
 
     private final ModelRouter modelRouter;
     private final LangfuseConfig langfuseConfig;
@@ -45,16 +45,16 @@ public class LangfuseTestController {
     }
 
     /**
-     * MiMo 模型测试 — GET /api/observability/test-mimo
-     * 使用 MiMo 模型发送简单对话，验证 Langfuse Trace 上报。
+     * Agnes AI 模型测试 — GET /api/observability/test-agnes
+     * 使用 Agnes AI 模型发送简单对话，验证 Langfuse Trace 上报。
      *
      * @param message 测试消息
      * @return 模型回答、Token 用量和 Trace ID
      */
-    @GetMapping("/test-mimo")
-    public ResponseEntity<Map<String, Object>> testMiMo(
+    @GetMapping("/test-agnes")
+    public ResponseEntity<Map<String, Object>> testAgnes(
             @RequestParam(defaultValue = "你好，请用一句话介绍自己") String message) {
-        return doTest("openAiChatModel", "xiaomi/mimo-v2.5-pro", message);
+        return doTest("openAiChatModel", "claude-sonnet-4-5-20250514", message);
     }
 
     /**
@@ -125,7 +125,7 @@ public class LangfuseTestController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("availableModels", availableModels);
         result.put("total", availableModels.size());
-        result.put("defaultTestModel", MIMO_MODEL);
+        result.put("defaultTestModel", AGNES_MODEL);
 
         return ResponseEntity.ok(result);
     }
