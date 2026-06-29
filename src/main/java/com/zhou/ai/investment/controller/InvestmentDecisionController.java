@@ -21,7 +21,7 @@ import java.util.Map;
  */
 @Tag(name = "投资决策", description = "智能投资代理决策引擎 - 完整投资决策流程")
 @RestController
-@RequestMapping("/api/investment")
+@RequestMapping("/investment")
 public class InvestmentDecisionController {
 
     private static final Logger log = LoggerFactory.getLogger(InvestmentDecisionController.class);
@@ -83,17 +83,66 @@ public class InvestmentDecisionController {
                     - 包含工作流数据（模块使用情况）
                     """
     )
-    @PostMapping("/decide")
+    @RequestMapping(value = "/decide", method = {RequestMethod.GET, RequestMethod.POST})
     public ResponseEntity<InvestmentDecisionResponse> decide(
-            @RequestBody InvestmentDecisionRequest request) {
+            @RequestParam(required = false) String message,
+            @RequestParam(required = false, defaultValue = "deepSeekChatModel") String modelName,
+            @RequestParam(required = false) String threadId,
+            @RequestParam(required = false, defaultValue = "true") boolean enableRAG,
+            @RequestParam(required = false, defaultValue = "true") boolean enableTools,
+            @RequestParam(required = false, defaultValue = "true") boolean enableGraph,
+            @RequestBody(required = false) InvestmentDecisionRequest body) {
 
-        log.info("收到投资决策请求: message={}", request.message());
+        // 优先使用 @RequestParam，如果为空则使用 @RequestBody
+        String actualMessage = message;
+        if (actualMessage == null && body != null) {
+            actualMessage = body.message();
+        }
 
-        if (request.message() == null || request.message().isBlank()) {
+        // 优先使用 @RequestParam，如果为空则使用 @RequestBody 或默认值
+        String actualModelName = modelName;
+        if (body != null && body.modelName() != null) {
+            actualModelName = body.modelName();
+        }
+
+        String actualThreadId = threadId;
+        if (body != null && body.threadId() != null) {
+            actualThreadId = body.threadId();
+        }
+
+        boolean actualEnableRAG = enableRAG;
+        if (body != null) {
+            actualEnableRAG = body.enableRAG();
+        }
+
+        boolean actualEnableTools = enableTools;
+        if (body != null) {
+            actualEnableTools = body.enableTools();
+        }
+
+        boolean actualEnableGraph = enableGraph;
+        if (body != null) {
+            actualEnableGraph = body.enableGraph();
+        }
+
+        log.info("收到投资决策请求: message={}, modelName={}, enableRAG={}, enableTools={}, enableGraph={}",
+                actualMessage, actualModelName, actualEnableRAG, actualEnableTools, actualEnableGraph);
+
+        if (actualMessage == null || actualMessage.isBlank()) {
             return ResponseEntity.badRequest().body(
                     InvestmentDecisionResponse.failed("message 不能为空")
             );
         }
+
+        // 构建请求对象
+        InvestmentDecisionRequest request = new InvestmentDecisionRequest(
+                actualMessage,
+                actualModelName,
+                actualThreadId,
+                actualEnableRAG,
+                actualEnableTools,
+                actualEnableGraph
+        );
 
         InvestmentDecisionResponse response = investmentDecisionService.decide(request);
 
@@ -128,15 +177,64 @@ public class InvestmentDecisionController {
                     - 更好的用户体验
                     """
     )
-    @PostMapping(value = "/decide/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @RequestMapping(value = "/decide/stream", method = {RequestMethod.GET, RequestMethod.POST}, produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<InvestmentStepEvent> decideStream(
-            @RequestBody InvestmentDecisionRequest request) {
+            @RequestParam(required = false) String message,
+            @RequestParam(required = false, defaultValue = "deepSeekChatModel") String modelName,
+            @RequestParam(required = false) String threadId,
+            @RequestParam(required = false, defaultValue = "true") boolean enableRAG,
+            @RequestParam(required = false, defaultValue = "true") boolean enableTools,
+            @RequestParam(required = false, defaultValue = "true") boolean enableGraph,
+            @RequestBody(required = false) InvestmentDecisionRequest body) {
 
-        log.info("收到流式投资决策请求: message={}", request.message());
+        // 优先使用 @RequestParam，如果为空则使用 @RequestBody
+        String actualMessage = message;
+        if (actualMessage == null && body != null) {
+            actualMessage = body.message();
+        }
 
-        if (request.message() == null || request.message().isBlank()) {
+        // 优先使用 @RequestParam，如果为空则使用 @RequestBody 或默认值
+        String actualModelName = modelName;
+        if (body != null && body.modelName() != null) {
+            actualModelName = body.modelName();
+        }
+
+        String actualThreadId = threadId;
+        if (body != null && body.threadId() != null) {
+            actualThreadId = body.threadId();
+        }
+
+        boolean actualEnableRAG = enableRAG;
+        if (body != null && body.enableRAG() != null) {
+            actualEnableRAG = body.enableRAG();
+        }
+
+        boolean actualEnableTools = enableTools;
+        if (body != null && body.enableTools() != null) {
+            actualEnableTools = body.enableTools();
+        }
+
+        boolean actualEnableGraph = enableGraph;
+        if (body != null && body.enableGraph() != null) {
+            actualEnableGraph = body.enableGraph();
+        }
+
+        log.info("收到流式投资决策请求: message={}, modelName={}, enableRAG={}, enableTools={}, enableGraph={}",
+                actualMessage, actualModelName, actualEnableRAG, actualEnableTools, actualEnableGraph);
+
+        if (actualMessage == null || actualMessage.isBlank()) {
             return Flux.just(InvestmentStepEvent.error("message 不能为空"));
         }
+
+        // 构建请求对象，使用默认值
+        InvestmentDecisionRequest request = new InvestmentDecisionRequest(
+                actualMessage,
+                actualModelName != null ? actualModelName : "deepSeekChatModel",
+                actualThreadId,
+                actualEnableRAG,
+                actualEnableTools,
+                actualEnableGraph
+        );
 
         return investmentDecisionService.decideStream(request);
     }
