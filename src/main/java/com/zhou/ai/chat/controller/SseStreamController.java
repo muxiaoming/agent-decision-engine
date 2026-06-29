@@ -16,7 +16,7 @@ import java.util.Map;
  * 以标准 SSE 协议流式返回回答。
  */
 @RestController
-@RequestMapping("/api/chat/sse")
+@RequestMapping("/chat/sse")
 public class SseStreamController {
 
     private final ChatService chatService;

@@ -15,7 +15,7 @@ import java.util.Map;
  * 以 Project Reactor Flux 方式流式返回回答。
  */
 @RestController
-@RequestMapping("/api/chat/flux")
+@RequestMapping("/chat/flux")
 public class FluxStreamController {
 
     private final ChatService chatService;

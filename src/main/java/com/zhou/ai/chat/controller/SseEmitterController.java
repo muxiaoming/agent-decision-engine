@@ -18,7 +18,7 @@ import java.util.concurrent.Executors;
  * 以 Spring MVC SseEmitter 方式流式返回回答。
  */
 @RestController
-@RequestMapping("/api/chat/emitter")
+@RequestMapping("/chat/emitter")
 public class SseEmitterController {
 
     private final ChatService chatService;

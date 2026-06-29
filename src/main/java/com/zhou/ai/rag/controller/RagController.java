@@ -12,7 +12,7 @@ import reactor.core.publisher.Flux;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/rag")
+@RequestMapping("/rag")
 public class RagController {
 
     private final RagService ragService;

@@ -14,7 +14,7 @@ import java.util.UUID;
  */
 @Tag(name = "Skills Agent", description = "Spring AI Alibaba Skills 演示")
 @RestController
-@RequestMapping("/api/skills")
+@RequestMapping("/skills")
 public class SkillsAgentController {
 
     private final SkillsAgentService skillsAgentService;
