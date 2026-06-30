@@ -23,13 +23,12 @@ public class GraphWorkflowService {
      */
     public Map<String, Object> execute(String input) {
         try {
-            // 适配 spring-ai-alibaba 1.1.2+ API: call → invoke
+            // 适配 spring-ai-alibaba 1.1.2+ API: call -> invoke
             java.util.Optional<OverAllState> result = compiledGraph.invoke(Map.of("input", input), RunnableConfig.builder().build());
             OverAllState state = result.get();
 
             return Map.of(
-                    "output", state.value("output").orElse("无输出"),
-                    "category", state.value("category").orElse("unknown")
+                    "output", state.value("output").orElse("无输出")
             );
         } catch (Exception e) {
             throw new RuntimeException("图工作流执行失败: " + e.getMessage(), e);

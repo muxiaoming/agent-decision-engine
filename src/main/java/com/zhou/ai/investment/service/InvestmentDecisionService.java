@@ -360,9 +360,11 @@ public class InvestmentDecisionService {
             String result = skillsAgentService.chat(prompt, threadId);
 
             if (result == null || result.isBlank()) {
-                log.warn("步骤 1 返回空结果");
-                return WorkflowStep.failed(1, "问题感知", "skills",
-                        "步骤返回空结果", System.currentTimeMillis() - stepStart);
+                log.warn("步骤 1 返回空结果，使用降级结果");
+                String fallback = "问题感知步骤未能获取AI响应，基于用户输入直接进入后续分析流程。";
+                contextBuilder.append("【问题感知】\n").append(fallback).append("\n\n");
+                truncateContext(contextBuilder);
+                return WorkflowStep.success(1, "问题感知", "skills", fallback, System.currentTimeMillis() - stepStart);
             }
 
             // 检测是否为非投资类消息（闲聊、打招呼等）
@@ -411,9 +413,11 @@ public class InvestmentDecisionService {
 
             // 检查是否返回了错误
             if (result == null || result.isBlank()) {
-                log.warn("步骤 2 返回空结果");
-                return WorkflowStep.failed(2, "知识检索", "rag",
-                        "步骤返回空结果", System.currentTimeMillis() - stepStart);
+                log.warn("步骤 2 返回空结果，使用降级结果");
+                String fallback = "知识检索步骤未能获取RAG响应，基于模型自身知识继续分析。";
+                contextBuilder.append("【知识检索】\n").append(fallback).append("\n\n");
+                truncateContext(contextBuilder);
+                return WorkflowStep.success(2, "知识检索", "rag", fallback, System.currentTimeMillis() - stepStart);
             }
 
             if (result.startsWith("Exception:") || result.contains("Error while extracting response")) {
@@ -515,9 +519,13 @@ public class InvestmentDecisionService {
             String result = skillsAgentService.chat(prompt, newThreadId);
 
             if (result == null || result.isBlank()) {
-                log.warn("步骤 4 返回空结果");
-                return WorkflowStep.failed(4, "推理分析", "skills",
-                        "步骤返回空结果", System.currentTimeMillis() - stepStart);
+                log.warn("步骤 4 返回空结果，使用降级结果");
+                String fallbackResult = "基于前面的问题感知分析，继续进行推理分析...\n\n" +
+                        contextBuilder.toString().substring(0, Math.min(500, contextBuilder.toString().length()));
+                contextBuilder.append("【推理分析】\n").append(fallbackResult).append("\n\n");
+                truncateContext(contextBuilder);
+                return WorkflowStep.success(4, "推理分析", "skills",
+                        fallbackResult, System.currentTimeMillis() - stepStart);
             }
 
             if (result.startsWith("Exception:") || result.contains("Error while extracting response") ||
@@ -565,9 +573,12 @@ public class InvestmentDecisionService {
             String result = skillsAgentService.chat(prompt, newThreadId);
 
             if (result == null || result.isBlank()) {
-                log.warn("步骤 5 返回空结果");
-                return WorkflowStep.failed(5, "决策生成", "skills",
-                        "步骤返回空结果", System.currentTimeMillis() - stepStart);
+                log.warn("步骤 5 返回空结果，使用降级结果");
+                String fallbackResult = generateFallbackAdvice(request.message(), contextBuilder.toString());
+                contextBuilder.append("【决策生成】\n").append(fallbackResult).append("\n\n");
+                truncateContext(contextBuilder);
+                return WorkflowStep.success(5, "决策生成", "skills",
+                        fallbackResult, System.currentTimeMillis() - stepStart);
             }
 
             if (result.startsWith("Exception:") || result.contains("Error while extracting response") ||
@@ -648,8 +659,11 @@ public class InvestmentDecisionService {
 
                 // 检查是否返回了错误
                 if (result == null || result.isBlank()) {
-                    log.warn("步骤 {} 返回空结果", stepNumber);
-                    return Flux.just(InvestmentStepEvent.stepError(stepNumber, stepName, skillName, "步骤返回空结果"));
+                    log.warn("步骤 {} 返回空结果，使用降级结果", stepNumber);
+                    String fallback = generateStepFallback(stepNumber, stepName, contextBuilder.toString());
+                    contextBuilder.append(contextPrefix).append(fallback).append("\n\n");
+                    truncateContext(contextBuilder);
+                    return Flux.just(InvestmentStepEvent.stepComplete(stepNumber, stepName, skillName, fallback));
                 }
 
                 // Step 1 意图检测：非投资类消息

@@ -21,7 +21,7 @@ public class GraphController {
     }
 
     /**
-     * 执行 Graph 工作流 — POST /api/graph/execute
+     * 执行 Graph 工作流 - POST /api/graph/execute
      */
     @PostMapping("/execute")
     public ResponseEntity<Map<String, Object>> execute(@RequestBody Map<String, String> request) {
@@ -35,11 +35,9 @@ public class GraphController {
         long totalDuration = System.currentTimeMillis() - startTime;
 
         String output = (String) result.get("output");
-        String category = (String) result.get("category");
 
         return ResponseEntity.ok(Map.of(
                 "output", output,
-                "branch", category,
                 "durationMs", totalDuration
         ));
     }

@@ -41,7 +41,7 @@ class ApplicationIntegrationTest {
 
     @Test
     @Order(2)
-    @DisplayName("POST /api/chat - 同步聊天（DeepSeek）")
+    @DisplayName("POST /api/chat - 同步聊天，DeepSeek")
     void chatSync() {
         ChatRequest req = new ChatRequest("你好，用一句话介绍自己", null, null);
         ResponseEntity<Map> resp = rest.postForEntity("/api/chat?modelName=deepSeekChatModel", req, Map.class);
@@ -89,14 +89,14 @@ class ApplicationIntegrationTest {
     @Order(6)
     @DisplayName("POST /api/graph/execute - Graph 工作流执行")
     void graphExecute() {
-        Map<String, String> req = Map.of("input", "如何学习编程技术");
+        Map<String, String> req = Map.of("input", "如何配置投资组合");
         ResponseEntity<Map> resp = rest.postForEntity("/api/graph/execute", req, Map.class);
         assertEquals(200, resp.getStatusCode().value());
         Map body = resp.getBody();
         assertNotNull(body);
-        assertEquals("technical", body.get("branch"), "应分类为 technical");
-        assertNotNull(body.get("output"));
-        System.out.println("Graph 分类: " + body.get("branch") + ", 输出: " + body.get("output"));
+        assertNotNull(body.get("output"), "应包含 output 字段");
+        assertNotNull(body.get("durationMs"), "应包含 durationMs 字段");
+        System.out.println("Graph 输出: " + body.get("output"));
     }
 
     // ==================== Observability 模块 ====================
@@ -134,7 +134,7 @@ class ApplicationIntegrationTest {
             ResponseEntity<Map> resp = rest.getForEntity("/api/observability/test-mimo", Map.class);
             assumeTrue(resp.getStatusCode().is2xxSuccessful(), "MiMo API 不可用，跳过测试");
             Map body = resp.getBody();
-            assertNotNull(body.get("content"), "应返回模型回复");
+            assertNotNull(body.get("content"), "应返回模型回答");
             assertNotNull(body.get("langfuseMode"), "应返回 langfuseMode");
             System.out.println("MiMo 测试成功，langfuseMode: " + body.get("langfuseMode"));
         } catch (Exception e) {
@@ -151,7 +151,7 @@ class ApplicationIntegrationTest {
             ResponseEntity<Map> resp = rest.getForEntity("/api/observability/test-deepseek", Map.class);
             assumeTrue(resp.getStatusCode().is2xxSuccessful(), "DeepSeek API 不可用，跳过测试");
             Map body = resp.getBody();
-            assertNotNull(body.get("content"), "应返回模型回复");
+            assertNotNull(body.get("content"), "应返回模型回答");
             assertNotNull(body.get("langfuseMode"), "应返回 langfuseMode");
             System.out.println("DeepSeek 测试成功，langfuseMode: " + body.get("langfuseMode"));
         } catch (Exception e) {
@@ -166,7 +166,7 @@ class ApplicationIntegrationTest {
     @Order(11)
     @DisplayName("POST /api/rag/ingest + POST /api/rag/ask - RAG 完整流程")
     void ragIngestAndAsk() {
-        // 摄入示例文档
+        // 摄入示例文档。
         org.springframework.core.io.FileSystemResource fileResource =
                 new org.springframework.core.io.FileSystemResource("src/main/resources/docs/sample.txt");
         LinkedMultiValueMap<String, Object> multipart = new LinkedMultiValueMap<>();
@@ -195,7 +195,7 @@ class ApplicationIntegrationTest {
     @Order(12)
     @DisplayName("POST /api/tools/chat - Function Calling 工具调用")
     void toolsChat() {
-        ChatRequest req = new ChatRequest("北京今天天气怎么样？", null, null);
+        ChatRequest req = new ChatRequest("帮我查一下苹果公司的股价", null, null);
         ResponseEntity<Map> resp = rest.postForEntity(
                 "/api/tools/chat?modelName=deepSeekChatModel", req, Map.class);
         assumeTrue(resp.getStatusCode().is2xxSuccessful(), "工具调用 API 不可用，跳过测试");
