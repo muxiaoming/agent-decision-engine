@@ -19,7 +19,7 @@ spring:
       base-url: https://api.deepseek.com
     openai:
       api-key: ${AGNES_AI_API_KEY:your-agnes-ai-api-key}
-      base-url: https://apihub.agnes-ai.com/v1
+      base-url: https://apihub.agnes-ai.com
       chat:
         options:
           model: agnes-2.0-flash
