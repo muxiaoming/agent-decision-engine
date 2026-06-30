@@ -1,4 +1,4 @@
-package com.zhou.ai.graph.config;
+﻿package com.zhou.ai.graph.config;
 
 import com.alibaba.cloud.ai.graph.KeyStrategyFactory;
 import com.alibaba.cloud.ai.graph.StateGraph;
@@ -35,15 +35,18 @@ public class WorkflowGraphConfig {
 
         return new StateGraph(keyStrategyFactory)
                 .addNode("classify", classifyNode())
+                .addNode("process_investment", processInvestmentNode())
                 .addNode("process_tech", processTechNode())
                 .addNode("process_lifestyle", processLifestyleNode())
                 .addNode("process_general", processGeneralNode())
                 .addNode("output", outputNode())
                 .addEdge(START, "classify")
                 .addConditionalEdges("classify", categoryRouter(),
-                        Map.of("technical", "process_tech",
+                        Map.of("investment", "process_investment",
+                                "technical", "process_tech",
                                 "lifestyle", "process_lifestyle",
                                 "general", "process_general"))
+                .addEdge("process_investment", "output")
                 .addEdge("process_tech", "output")
                 .addEdge("process_lifestyle", "output")
                 .addEdge("process_general", "output")
@@ -61,6 +64,15 @@ public class WorkflowGraphConfig {
     private AsyncEdgeAction categoryRouter() {
         return state -> CompletableFuture.completedFuture(
                 (String) state.value("category").orElse("general"));
+    }
+
+    private AsyncNodeAction processInvestmentNode() {
+        return state -> {
+            String input = (String) state.value("input").orElse("");
+            String category = (String) state.value("category").orElse("investment");
+            String result = "【投资分析】" + input + " —— 归类为投资/金融类内容，建议从市场趋势、风险评估和资产配置角度进行深入分析。";
+            return CompletableFuture.completedFuture(Map.of("processedResult", result, "category", category));
+        };
     }
 
     private AsyncNodeAction processTechNode() {
@@ -98,10 +110,18 @@ public class WorkflowGraphConfig {
 
     private String classifyContent(String input) {
         String lower = input.toLowerCase();
+        // 投资/金融类
+        if (containsAny(lower, "股票", "基金", "投资", "理财", "市场", "portfolio", "etf", "指数",
+                "风险", "收益", "仓位", "建仓", "持仓", "买入", "卖出", "配置", "科技股",
+                "财报", "估值", "市盈率", "纳斯达克", "标普", "道琼斯",
+                "盈利", "亏损", "涨", "跌", "涨幅", "跌幅", "资产", "养老",
+                "金融", "债券", "股息", "分红", "定投", "对冲", "组合")) {
+            return "investment";
+        }
         if (containsAny(lower, "代码", "编程", "技术", "开发", "算法", "架构", "api", "框架", "bug")) {
             return "technical";
         }
-        if (containsAny(lower, "天气", "旅游", "美食", "运动", "休闲", "玩", "好", "快乐")) {
+        if (containsAny(lower, "天气", "旅游", "美食", "运动", "休闲", "玩", "快乐")) {
             return "lifestyle";
         }
         return "general";
@@ -116,3 +136,5 @@ public class WorkflowGraphConfig {
         return false;
     }
 }
+
+
