@@ -78,19 +78,22 @@ public class InvestmentDecisionService {
     private final MarketIndexToolService marketIndexToolService;
     private final RiskCalculatorToolService riskCalculatorToolService;
     private final GraphWorkflowService graphWorkflowService;
+    private final IntentClassifier intentClassifier;
 
     public InvestmentDecisionService(SkillsAgentService skillsAgentService,
                                      RagService ragService,
                                      StockPriceToolService stockPriceToolService,
                                      MarketIndexToolService marketIndexToolService,
                                      RiskCalculatorToolService riskCalculatorToolService,
-                                     GraphWorkflowService graphWorkflowService) {
+                                     GraphWorkflowService graphWorkflowService,
+                                     IntentClassifier intentClassifier) {
         this.skillsAgentService = skillsAgentService;
         this.ragService = ragService;
         this.stockPriceToolService = stockPriceToolService;
         this.marketIndexToolService = marketIndexToolService;
         this.riskCalculatorToolService = riskCalculatorToolService;
         this.graphWorkflowService = graphWorkflowService;
+        this.intentClassifier = intentClassifier;
     }
 
     /**
@@ -118,39 +121,30 @@ public class InvestmentDecisionService {
         TokenUsage totalTokenUsage = new TokenUsage(0, 0, 0);
 
         try {
-            // Step 1: 问题感知 (Skills) — 内置意图判断
+            // ── 入口意图判断：使用 IntentClassifier 两层分类器 ──
+            boolean isInvestment = intentClassifier.isInvestmentRelated(request.message(), modelName);
+
+            if (!isInvestment) {
+                log.info("非投资类消息（意图分类结果），直接回复");
+                long durationMs = System.currentTimeMillis() - startTime;
+
+                String chatReply = "您好，我是投资决策助手，专注于金融投资相关问题。" +
+                        "如果您有任何投资理财方面的问题，欢迎随时提问！😊";
+
+                List<DecisionStep> decisionSteps = List.of(
+                        new DecisionStep(1, "意图识别", "classifier", "completed", chatReply, null)
+                );
+
+                return InvestmentDecisionResponse.success(
+                        threadId, decisionSteps, chatReply, null,
+                        durationMs, totalTokenUsage, modelName);
+            }
+
+            // Step 1: 问题感知 (Skills)
             log.info("Step 1: 执行问题感知");
             WorkflowStep step1 = executeProblemPerception(request, threadId, contextBuilder);
             steps.add(step1);
             totalTokenUsage = accumulateTokenUsage(totalTokenUsage, step1.tokenUsage());
-
-            // 如果不是投资类消息（闲聊/打招呼），跳过后续步骤
-            boolean isNonInvestment = "对话回复".equals(step1.name());
-            if (isNonInvestment) {
-                log.info("非投资类消息，跳过后续决策步骤");
-
-                // 构建最终响应
-                long durationMs = System.currentTimeMillis() - startTime;
-                String finalAdvice = step1.result();
-
-                log.info("对话回复完成: 耗时={}ms", durationMs);
-
-                // 将 WorkflowStep 转换为 DecisionStep
-                List<DecisionStep> decisionSteps = steps.stream()
-                        .map(ws -> new DecisionStep(
-                                ws.step(),
-                                ws.name(),
-                                ws.module(),
-                                ws.status(),
-                                ws.result(),
-                                ws.error()
-                        ))
-                        .toList();
-
-                return InvestmentDecisionResponse.success(
-                        threadId, decisionSteps, finalAdvice, null,
-                        durationMs, totalTokenUsage, modelName);
-            }
 
             // Step 2: 知识检索 (RAG) - 条件执行
             if (workflowData.isRAGEnabled()) {
@@ -239,6 +233,21 @@ public class InvestmentDecisionService {
             );
 
             StringBuilder contextBuilder = new StringBuilder();
+
+            // ── 入口意图判断：使用 IntentClassifier 两层分类器 ──
+            boolean isInvestment = intentClassifier.isInvestmentRelated(request.message(), modelName);
+
+            if (!isInvestment) {
+                log.info("流式非投资类消息（意图分类结果），直接回复");
+                long durationMs = System.currentTimeMillis() - startTime;
+                String chatReply = "您好，我是投资决策助手，专注于金融投资相关问题。" +
+                        "如果您有任何投资理财方面的问题，欢迎随时提问！😊";
+                return Flux.just(
+                        InvestmentStepEvent.stepStart(1, "意图识别", "classifier"),
+                        InvestmentStepEvent.stepComplete(1, "意图识别", "classifier", chatReply),
+                        InvestmentStepEvent.decisionComplete(threadId, chatReply, null, durationMs)
+                );
+            }
 
             // 构建 Step 1 的流
             Flux<InvestmentStepEvent> step1Flux = Flux.concat(
@@ -700,8 +709,8 @@ public class InvestmentDecisionService {
                     - 技术迭代可能颠覆现有格局
 
                     ### 配置建议
-                    - 中等风险配置：股票50-60%，债券30%，现金10-20%
-                    - 科技股内部细分：大型龙头50%、云计算20%、半导体15%、ETF 15%
+                    - 中等风险配置：股票50-60%%，债券30%%，现金10-20%%
+                    - 科技股内部细分：大型龙头50%%、云计算20%%、半导体15%%、ETF 15%%
 
                     > 已收集上下文: %s
                     """.formatted(contextSnippet);
@@ -713,14 +722,14 @@ public class InvestmentDecisionService {
                     - 投资期限：建议中长期持有（2-5年）
 
                     ### 具体操作建议
-                    - 科技股配置约55%（55,000元）
-                    - 债券/理财约30%（30,000元）
-                    - 现金储备约15%（15,000元）
+                    - 科技股配置约55%%（55,000元）
+                    - 债券/理财约30%%（30,000元）
+                    - 现金储备约15%%（15,000元）
 
                     ### 风险控制
-                    - 止盈线：+20%~30%，分批止盈
-                    - 止损线：-10%~15%，严格执行
-                    - 单只个股仓位不超过总资金10%
+                    - 止盈线：+20%%~30%%，分批止盈
+                    - 止损线：-10%%~15%%，严格执行
+                    - 单只个股仓位不超过总资金10%%
 
                     ### 注意事项
                     - 投资有风险，入市需谨慎
@@ -920,7 +929,7 @@ public class InvestmentDecisionService {
 
                 ### 投资策略建议
                 1. **分散投资**：建议投资 3-5 只科技股或科技 ETF
-                2. **风险控制**：设置止损点，建议亏损不超过 15%
+                2. **风险控制**：设置止损点，建议亏损不超过 15%%
                 3. **持有周期**：建议中长期持有（2-5 年）
                 4. **仓位管理**：建议分批建仓，不要一次性投入全部资金
 
