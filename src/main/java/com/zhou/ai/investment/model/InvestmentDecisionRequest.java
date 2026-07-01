@@ -18,7 +18,7 @@ public record InvestmentDecisionRequest(
          * 可选值: deepSeekChatModel, openAiChatModel, dashscopeChatModel
          * 默认值: deepSeekChatModel
          */
-        @JsonProperty(defaultValue = "deepSeekChatModel")
+        @JsonProperty(defaultValue = "openAiChatModel")
         String modelName,
 
         /**
@@ -53,7 +53,7 @@ public record InvestmentDecisionRequest(
      * 创建默认请求。
      */
     public static InvestmentDecisionRequest of(String message) {
-        return new InvestmentDecisionRequest(message, "deepSeekChatModel", null, null, null, null);
+        return new InvestmentDecisionRequest(message, "openAiChatModel", null, null, null, null);
     }
 
     /**
@@ -82,7 +82,7 @@ public record InvestmentDecisionRequest(
      * 获取有效的模型名称。
      */
     public String effectiveModelName() {
-        return modelName != null ? modelName : "deepSeekChatModel";
+        return modelName != null ? modelName : "openAiChatModel";
     }
 
     /**
