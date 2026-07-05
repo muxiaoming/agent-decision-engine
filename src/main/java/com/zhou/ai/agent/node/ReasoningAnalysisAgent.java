@@ -51,7 +51,7 @@ public class ReasoningAnalysisAgent {
                 if (result == null || result.isBlank()) result = FALLBACK;
                 return CompletableFuture.completedFuture(Map.of(AgentGraphState.REASONING_RESULT, result));
             } catch (Exception e) {
-                log.warn("[推理分析Agent] 异常: {}", e.getMessage());
+                log.warn("[推理分析Agent] 异常: {}", e.getMessage(), e);
                 return CompletableFuture.completedFuture(Map.of(AgentGraphState.REASONING_RESULT, FALLBACK));
             }
         };

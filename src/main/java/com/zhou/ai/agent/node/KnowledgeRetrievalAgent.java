@@ -47,7 +47,7 @@ public class KnowledgeRetrievalAgent {
                         AgentGraphState.RETRIEVAL_RESULT, result,
                         AgentGraphState.RETRIEVAL_STATUS, "completed"));
             } catch (Exception e) {
-                log.warn("[知识检索Agent] 异常: {}", e.getMessage());
+                log.warn("[知识检索Agent] 异常: {}", e.getMessage(), e);
                 return CompletableFuture.completedFuture(Map.of(
                         AgentGraphState.RETRIEVAL_RESULT, FALLBACK,
                         AgentGraphState.RETRIEVAL_STATUS, "completed"));

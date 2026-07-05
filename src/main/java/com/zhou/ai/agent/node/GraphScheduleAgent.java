@@ -56,7 +56,7 @@ public class GraphScheduleAgent {
                 if (result == null || result.isBlank()) result = FALLBACK;
                 return CompletableFuture.completedFuture(Map.of(AgentGraphState.SCHEDULE_RESULT, result));
             } catch (Exception e) {
-                log.warn("[流程编排Agent] 异常: {}", e.getMessage());
+                log.warn("[流程编排Agent] 异常: {}", e.getMessage(), e);
                 return CompletableFuture.completedFuture(Map.of(AgentGraphState.SCHEDULE_RESULT, FALLBACK));
             }
         };

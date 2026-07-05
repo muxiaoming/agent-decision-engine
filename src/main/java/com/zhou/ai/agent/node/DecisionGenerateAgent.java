@@ -48,7 +48,7 @@ public class DecisionGenerateAgent {
                 if (result == null || result.isBlank()) result = FALLBACK;
                 return CompletableFuture.completedFuture(Map.of(AgentGraphState.DECISION_RESULT, result));
             } catch (Exception e) {
-                log.warn("[决策生成Agent] 异常: {}", e.getMessage());
+                log.warn("[决策生成Agent] 异常: {}", e.getMessage(), e);
                 return CompletableFuture.completedFuture(Map.of(AgentGraphState.DECISION_RESULT, FALLBACK));
             }
         };

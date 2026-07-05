@@ -1,41 +1,46 @@
 package com.zhou.ai.agent.service;
 
-import com.alibaba.cloud.ai.graph.CompiledGraph;
 import com.alibaba.cloud.ai.graph.OverAllState;
-import com.alibaba.cloud.ai.graph.RunnableConfig;
-import com.alibaba.cloud.ai.graph.StateGraph;
-import com.alibaba.cloud.ai.graph.exception.GraphStateException;
+import com.alibaba.cloud.ai.graph.action.AsyncNodeAction;
 import com.zhou.ai.agent.model.AgentGraphState;
+import com.zhou.ai.agent.node.DataFetchAgent;
+import com.zhou.ai.agent.node.DecisionGenerateAgent;
+import com.zhou.ai.agent.node.GraphScheduleAgent;
+import com.zhou.ai.agent.node.IntentClassifyAgent;
+import com.zhou.ai.agent.node.KnowledgeRetrievalAgent;
+import com.zhou.ai.agent.node.ProblemPerceptionAgent;
+import com.zhou.ai.agent.node.ReasoningAnalysisAgent;
 import com.zhou.ai.investment.model.InvestmentDecisionRequest;
 import com.zhou.ai.investment.model.InvestmentStepEvent;
-import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * 多Agent投资决策服务 - 独立的多Agent Graph流式执行服务。
  *
  * <p><b>设计说明：</b>
- * 本服务使用7节点多Agent StateGraph执行完整的投资决策流程。
- * 7个Agent节点以线性串行链路固定排列，由Graph原生条件路由仅在意图分类
- * （非投资→END）处做分支控制，其余节点全部串行执行。
+ * 本服务手动串联7个Agent节点的{@link AsyncNodeAction}，使用
+ * {@link Flux#concat(org.reactivestreams.Publisher[])} + {@link Flux#defer(java.util.function.Supplier)}
+ * 实现真正的逐节点流式推送，确保前端能获得打字机效果。
  *
- * <p><b>与原有{@code InvestmentDecisionService}的区别：</b>
- * <ul>
- *   <li><b>原有服务</b>：手写6步Flux链，enableRag/enableTools控制步骤跳转</li>
- *   <li><b>本服务</b>：7个Agent节点线性串行，LLM自主判断检索/工具调用需求，
- *       无需外部参数控制</li>
- * </ul>
+ * <p><b>为什么要手动串联：</b>
+ * {@code CompiledGraph.stream()} 虽然返回 {@code Flux<NodeOutput>}，
+ * 但每个Agent的{@code AsyncNodeAction}内部同步阻塞等待LLM响应后返回已完成Future，
+ * 导致{@code GraphRunner}看到所有节点瞬间完成，所有NodeOutput几乎同时emit。
+ * 手动{@code Flux.concat()}链保证每个步骤的阻塞调用在上一步事件推送完成之后才订阅执行。
  *
- * <p><b>事件格式对齐：</b>
- * 输出的{@code Flux<InvestmentStepEvent>}结构、字段、事件类型、步骤名称、
- * 最终决策事件格式与原有decideStream完全一致。
+ * <p><b>7节点执行路径：</b>
+ * <pre>
+ *   intentClassify → problemPerception → knowledgeRetrieval
+ *   → dataFetch → reasoningAnalysis → decisionGenerate
+ *   → graphSchedule → decisionComplete
+ * </pre>
  *
  * @since 2026-06-30
  */
@@ -45,8 +50,8 @@ public class MultiAgentInvestService {
     private static final Logger log = LoggerFactory.getLogger(MultiAgentInvestService.class);
 
     private static final String RISK_WARNING_TEMPLATE = """
-            \u26a0\uFE0F 风险提示
-            \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+            ⚠️ 风险提示
+            ━━━━━━━━━━━━━━━
             1. 投资有风险，入市需谨慎
             2. 以上投资建议仅供参考，不构成投资建议
             3. 过往业绩不代表未来表现
@@ -54,136 +59,163 @@ public class MultiAgentInvestService {
             5. 如有疑问，请咨询专业投资顾问
             """;
 
-    private final StateGraph multiAgentWorkflowGraph;
+    private static final String MODULE_NAME = "agent";
 
-    private CompiledGraph compiledGraph;
+    private final IntentClassifyAgent intentClassifyAgent;
+    private final ProblemPerceptionAgent problemPerceptionAgent;
+    private final KnowledgeRetrievalAgent knowledgeRetrievalAgent;
+    private final DataFetchAgent dataFetchAgent;
+    private final ReasoningAnalysisAgent reasoningAnalysisAgent;
+    private final DecisionGenerateAgent decisionGenerateAgent;
+    private final GraphScheduleAgent graphScheduleAgent;
 
     public MultiAgentInvestService(
-            @Qualifier("multiAgentWorkflowGraph") StateGraph multiAgentWorkflowGraph) {
-        this.multiAgentWorkflowGraph = multiAgentWorkflowGraph;
-    }
-
-    @PostConstruct
-    public void init() throws GraphStateException {
-        log.info("编译 multiAgent StateGraph...");
-        this.compiledGraph = multiAgentWorkflowGraph.compile();
-        log.info("multiAgent StateGraph 编译完成");
+            IntentClassifyAgent intentClassifyAgent,
+            ProblemPerceptionAgent problemPerceptionAgent,
+            KnowledgeRetrievalAgent knowledgeRetrievalAgent,
+            DataFetchAgent dataFetchAgent,
+            ReasoningAnalysisAgent reasoningAnalysisAgent,
+            DecisionGenerateAgent decisionGenerateAgent,
+            GraphScheduleAgent graphScheduleAgent) {
+        this.intentClassifyAgent = intentClassifyAgent;
+        this.problemPerceptionAgent = problemPerceptionAgent;
+        this.knowledgeRetrievalAgent = knowledgeRetrievalAgent;
+        this.dataFetchAgent = dataFetchAgent;
+        this.reasoningAnalysisAgent = reasoningAnalysisAgent;
+        this.decisionGenerateAgent = decisionGenerateAgent;
+        this.graphScheduleAgent = graphScheduleAgent;
+        log.info("MultiAgentInvestService 初始化：7个Agent节点已注入，流式执行模式");
     }
 
     /**
-     * 流式执行多Agent投资决策流程。
+     * 流式执行多Agent投资决策流程 —— 真正的逐节点推送。
      *
-     * <p>事件序列与原有decideStream完全对齐：
+     * <p>通过{@link Flux#concat}串联各Agent节点的{@link AsyncNodeAction}：
      * <ol>
-     *   <li>step1: 意图分类</li>
-     *   <li>step2: 问题感知</li>
-     *   <li>step3: 知识检索</li>
-     *   <li>step4: 数据获取</li>
-     *   <li>step5: 推理分析</li>
-     *   <li>step6: 决策生成</li>
-     *   <li>step7: 汇总输出</li>
-     *   <li>decision_complete: 最终事件</li>
+     *   <li>意图分类 → 立即推送 step1 事件</li>
+     *   <li>问题感知 → 立即推送 step2 事件</li>
+     *   <li>知识检索 → 立即推送 step3 事件</li>
+     *   <li>数据获取 → 立即推送 step4 事件</li>
+     *   <li>推理分析 → 立即推送 step5 事件</li>
+     *   <li>决策生成 → 立即推送 step6 事件</li>
+     *   <li>汇总输出 → 立即推送 step7 事件</li>
+     *   <li>流程结束 → 推送 decision_complete 事件</li>
      * </ol>
      */
     public Flux<InvestmentStepEvent> executeStream(InvestmentDecisionRequest request) {
         long startTime = System.currentTimeMillis();
         String threadId = request.effectiveThreadId();
 
-        log.info("开始multiAgent线性串行决策: threadId={}", threadId);
+        log.info("开始multiAgent流式决策（手动Flux链模式）: threadId={}", threadId);
+
+        Map<String, Object> state = buildInitialState(
+                request.message(), request.effectiveModelName(), threadId, startTime);
+
+        // ── Step 1: 意图分类（总是执行） ──
+        Flux<InvestmentStepEvent> step1 = executeStep(
+                state, intentClassifyAgent.asNodeAction(),
+                1, "意图分类", AgentGraphState.INTENT_RESULT);
+
+        // ── Step 1 完成后动态决定后续步骤 ──
+        return step1.concatWith(Flux.defer(() -> {
+            boolean isInvestment = "true".equals(
+                    (String) state.getOrDefault(AgentGraphState.IS_INVESTMENT, "true"));
+
+            if (!isInvestment) {
+                log.info("非投资类消息，跳过Step 2-7，直接返回");
+                return Mono.fromCallable(() -> buildDecisionComplete(threadId,
+                        "您好，我是投资决策助手，专注于金融投资相关问题。"
+                                + "如果您有任何投资理财方面的问题，欢迎随时提问！",
+                        null, startTime));
+            }
+
+            return Flux.concat(
+                    executeStep(state, problemPerceptionAgent.asNodeAction(),
+                            2, "问题感知", AgentGraphState.PERCEPTION_RESULT),
+                    executeStep(state, knowledgeRetrievalAgent.asNodeAction(),
+                            3, "知识检索", AgentGraphState.RETRIEVAL_RESULT),
+                    executeStep(state, dataFetchAgent.asNodeAction(),
+                            4, "数据获取", AgentGraphState.DATA_RESULT),
+                    executeStep(state, reasoningAnalysisAgent.asNodeAction(),
+                            5, "推理分析", AgentGraphState.REASONING_RESULT),
+                    executeStep(state, decisionGenerateAgent.asNodeAction(),
+                            6, "决策生成", AgentGraphState.DECISION_RESULT),
+                    executeStep(state, graphScheduleAgent.asNodeAction(),
+                            7, "汇总输出", AgentGraphState.SCHEDULE_RESULT),
+                    Mono.fromCallable(() -> buildDecisionComplete(threadId,
+                            "投资决策已完成，请查看各步骤详情",
+                            RISK_WARNING_TEMPLATE, startTime))
+            );
+        }));
+    }
+
+    // ==================== 步骤执行 ====================
+
+    /**
+     * 执行单个Agent节点，返回{@code stepStart + stepComplete}事件流。
+     *
+     * <p>使用{@link Flux#defer}确保阻塞LLM调用在订阅时才执行，
+     * 配合外层{@link Flux#concat}实现真正的逐步骤推送。
+     *
+     * @param state       运行状态Map（会被本方法修改）
+     * @param action      节点的AsyncNodeAction
+     * @param stepNum     步骤编号
+     * @param displayName 步骤显示名称
+     * @param resultKey   结果写入state的key
+     */
+    private Flux<InvestmentStepEvent> executeStep(
+            Map<String, Object> state,
+            AsyncNodeAction action,
+            int stepNum,
+            String displayName,
+            String resultKey) {
 
         return Flux.defer(() -> {
-            try {
-                // ── 构建初始状态并执行Graph（一次invoke执行全部节点） ──
-                Map<String, Object> initialState = buildInitialState(
-                        request.message(), request.effectiveModelName(), threadId, startTime);
+            log.info("Step {} ({}) 开始执行", stepNum, displayName);
+            long stepStart = System.currentTimeMillis();
 
-                Optional<OverAllState> result = compiledGraph.invoke(initialState,
-                        RunnableConfig.builder().build());
-
-                if (result.isEmpty()) {
-                    return Flux.just(InvestmentStepEvent.error("Graph执行无返回结果"));
-                }
-
-                OverAllState state = result.get();
-                long totalDuration = System.currentTimeMillis() - startTime;
-
-                // 读取isInvestment状态
-                String isInvestment = (String) state.value(AgentGraphState.IS_INVESTMENT).orElse("true");
-                boolean isInvest = "true".equals(isInvestment);
-
-                if (!isInvest) {
-                    // ── 非投资消息：仅执行意图分类 ──
-                    log.info("非投资消息，直接回复");
-                    String chatReply = "您好，我是投资决策助手，专注于金融投资相关问题。" +
-                            "如果您有任何投资理财方面的问题，欢迎随时提问！";
-                    return Flux.just(
-                            InvestmentStepEvent.stepStart(1, "意图分类", "agent"),
-                            InvestmentStepEvent.stepComplete(1, "意图分类", "agent", chatReply),
-                            InvestmentStepEvent.decisionComplete(threadId, chatReply, null, totalDuration)
-                    );
-                }
-
-                // ── 投资消息：读取所有Agent结果 ──
-                String intentResult = readState(state, AgentGraphState.INTENT_RESULT, "意图分类完成");
-                String perceptionResult = readState(state, AgentGraphState.PERCEPTION_RESULT, "问题感知完成");
-                String retrievalResult = readState(state, AgentGraphState.RETRIEVAL_RESULT, "知识检索完成");
-                String dataResult = readState(state, AgentGraphState.DATA_RESULT, "数据获取完成");
-                String reasoningResult = readState(state, AgentGraphState.REASONING_RESULT, "推理分析完成");
-                String decisionResult = readState(state, AgentGraphState.DECISION_RESULT, "决策生成完成");
-                String scheduleResult = readState(state, AgentGraphState.SCHEDULE_RESULT, "汇总输出完成");
-
-                log.info("Graph执行完成，7个Agent结果均已读取");
-
-                // ── 构建事件序列 ──
-                String finalAdvice = decisionResult != null ? decisionResult : "投资决策已完成，请查看各步骤详情";
-
-                return Flux.just(
-                        // 步骤1: 意图分类
-                        InvestmentStepEvent.stepStart(1, "意图分类", "agent"),
-                        InvestmentStepEvent.stepComplete(1, "意图分类", "agent", intentResult),
-                        // 步骤2: 问题感知
-                        InvestmentStepEvent.stepStart(2, "问题感知", "agent"),
-                        InvestmentStepEvent.stepComplete(2, "问题感知", "agent", perceptionResult),
-                        // 步骤3: 知识检索
-                        InvestmentStepEvent.stepStart(3, "知识检索", "agent"),
-                        InvestmentStepEvent.stepComplete(3, "知识检索", "agent", retrievalResult),
-                        // 步骤4: 数据获取
-                        InvestmentStepEvent.stepStart(4, "数据获取", "agent"),
-                        InvestmentStepEvent.stepComplete(4, "数据获取", "agent", dataResult),
-                        // 步骤5: 推理分析
-                        InvestmentStepEvent.stepStart(5, "推理分析", "agent"),
-                        InvestmentStepEvent.stepComplete(5, "推理分析", "agent", reasoningResult),
-                        // 步骤6: 决策生成
-                        InvestmentStepEvent.stepStart(6, "决策生成", "agent"),
-                        InvestmentStepEvent.stepComplete(6, "决策生成", "agent", decisionResult),
-                        // 步骤7: 汇总输出
-                        InvestmentStepEvent.stepStart(7, "汇总输出", "agent"),
-                        InvestmentStepEvent.stepComplete(7, "汇总输出", "agent", scheduleResult),
-                        // 最终完成事件
-                        InvestmentStepEvent.decisionComplete(
-                                threadId, finalAdvice, RISK_WARNING_TEMPLATE, totalDuration)
-                );
-
-            } catch (Exception e) {
-                log.error("multiAgent流程异常: {}", e.getMessage(), e);
-                return Flux.just(InvestmentStepEvent.error("流程异常: " + e.getMessage()));
-            }
+            // stepStart 在当前 NIO 线程立即 emit → Netty 写入 buffer
+            // 用 subscribeOn(boundedElastic) 把阻塞 LLM 调用踢到 worker 线程
+            // → NIO 线程释放，Netty 自动 flush buffer → 前端立即收到 stepStart
+            return Flux.concat(
+                    Flux.just(InvestmentStepEvent.stepStart(stepNum, displayName, MODULE_NAME)),
+                    Mono.fromCallable(() -> action.apply(new OverAllState(state)).get())
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .flatMapMany(updateMap -> {
+                                state.putAll(updateMap);
+                                String result = (String) updateMap.getOrDefault(
+                                        resultKey, "【降级】" + displayName + "完成");
+                                long stepDuration = System.currentTimeMillis() - stepStart;
+                                log.info("Step {} ({}) 完成，耗时={}ms", stepNum, displayName, stepDuration);
+                                return Flux.just(InvestmentStepEvent.stepComplete(
+                                        stepNum, displayName, MODULE_NAME, result));
+                            })
+                            .onErrorResume(e -> {
+                                log.warn("Step {} ({}) 失败: {}", stepNum, displayName, e.getMessage());
+                                String fallback = "【降级】" + displayName + "异常: " + e.getMessage();
+                                state.put(resultKey, fallback);
+                                return Flux.just(InvestmentStepEvent.stepError(
+                                        stepNum, displayName, MODULE_NAME, e.getMessage()));
+                            })
+            );
         });
     }
 
-    /**
-     * 安全地从OverAllState读取指定key的值。
-     */
-    private String readState(OverAllState state, String key, String fallback) {
-        return (String) state.value(key).orElse("【降级】" + fallback);
+    // ==================== 辅助方法 ====================
+
+    private InvestmentStepEvent buildDecisionComplete(
+            String threadId, String finalAdvice, String riskWarning, long startTime) {
+        long totalDuration = System.currentTimeMillis() - startTime;
+        log.info("multiAgent流式决策完成: 耗时={}ms", totalDuration);
+        return InvestmentStepEvent.decisionComplete(threadId, finalAdvice, riskWarning, totalDuration);
     }
 
     /**
-     * 构建Graph初始状态。
+     * 构建 Graph 初始状态。
      */
     private Map<String, Object> buildInitialState(String userMessage, String modelName,
                                                    String threadId, long startTime) {
-        return Map.ofEntries(
+        return new java.util.HashMap<>(Map.ofEntries(
                 Map.entry(AgentGraphState.USER_MESSAGE, userMessage),
                 Map.entry(AgentGraphState.MODEL_NAME, modelName),
                 Map.entry(AgentGraphState.THREAD_ID, threadId),
@@ -200,6 +232,6 @@ public class MultiAgentInvestService {
                 Map.entry(AgentGraphState.REASONING_RESULT, ""),
                 Map.entry(AgentGraphState.DECISION_RESULT, ""),
                 Map.entry(AgentGraphState.SCHEDULE_RESULT, "")
-        );
+        ));
     }
 }

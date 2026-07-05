@@ -36,11 +36,13 @@ public class ProblemPerceptionAgent {
             AgentPipelineContext ctx = AgentPipelineContext.from(state);
             try {
                 ReactAgent agent = factory.getProblemPerceptionAgent(ctx.modelName());
+                log.info("before react call");
                 String result = agent.call(FMT.formatted(ctx.userMessage())).getText();
+                log.info("after react call");
                 if (result == null || result.isBlank()) result = FALLBACK;
                 return CompletableFuture.completedFuture(Map.of(AgentGraphState.PERCEPTION_RESULT, result));
             } catch (Exception e) {
-                log.warn("[问题感知Agent] 异常: {}", e.getMessage());
+                log.warn("[问题感知Agent] 异常: {}", e.getMessage(), e);
                 return CompletableFuture.completedFuture(Map.of(AgentGraphState.PERCEPTION_RESULT, FALLBACK));
             }
         };

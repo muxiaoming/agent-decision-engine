@@ -1,7 +1,8 @@
 package com.zhou.ai.agent.config;
 
-import com.alibaba.cloud.ai.graph.CompileConfig;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
+import com.alibaba.cloud.ai.graph.agent.hook.modelcalllimit.ModelCallLimitHook;
+import com.alibaba.cloud.ai.graph.checkpoint.savers.MemorySaver;
 import com.zhou.ai.agent.tool.KnowledgeRetrievalTool;
 import com.zhou.ai.tools.service.MarketIndexToolService;
 import com.zhou.ai.tools.service.RiskCalculatorToolService;
@@ -33,6 +34,9 @@ public class ReactAgentFactory {
     private static final Logger log = LoggerFactory.getLogger(ReactAgentFactory.class);
 
     private static final String DEFAULT_MODEL = "openAiChatModel";
+
+    /** 需要 Function Calling 能力的 Agent 优先使用的模型（DeepSeek 支持多工具调用）。 */
+    private static final String TOOLS_CAPABLE_MODEL = "deepSeekChatModel";
 
     // ==================== 系统提示词（与原有 MultiChatClientConfig 保持一致） ====================
 
@@ -185,35 +189,33 @@ public class ReactAgentFactory {
         return ReactAgent.builder()
                 .name("problem-perception")
                 .model(model)
-                .compileConfig(CompileConfig.builder().recursionLimit(2).build())
                 .instruction(PROBLEM_PERCEPTION_PROMPT)
-                .includeContents(true)
                 .build();
     }
 
     private ReactAgent buildKnowledgeRetrievalAgent(String modelName) {
-        ChatModel model = resolveModel(modelName);
-        log.info("构建知识检索Agent | model={}", modelName);
+        ChatModel model = resolveToolModel(modelName);
+        log.info("构建知识检索Agent | requestedModel={} | actualModel={}",
+                modelName, TOOLS_CAPABLE_MODEL);
         return ReactAgent.builder()
                 .name("knowledge-retrieval")
                 .model(model)
-                .compileConfig(CompileConfig.builder().recursionLimit(1).build())
                 .instruction(KNOWLEDGE_RETRIEVAL_PROMPT)
                 .methodTools(knowledgeRetrievalTool)
-                .includeContents(true)
                 .build();
     }
 
     private ReactAgent buildDataFetchAgent(String modelName) {
-        ChatModel model = resolveModel(modelName);
-        log.info("构建数据获取Agent | model={}", modelName);
+        ChatModel model = resolveToolModel(modelName);
+        log.info("构建数据获取Agent | requestedModel={} | actualModel={}",
+                modelName, TOOLS_CAPABLE_MODEL);
         return ReactAgent.builder()
                 .name("data-fetch")
                 .model(model)
-                .compileConfig(CompileConfig.builder().recursionLimit(2).build())
                 .instruction(DATA_FETCH_PROMPT)
                 .methodTools(stockPriceToolService, marketIndexToolService, riskCalculatorToolService)
-                .includeContents(true)
+//                .hooks(ModelCallLimitHook.builder().runLimit(1).build())  // 限制模型调用次数为5次
+//                .saver(new MemorySaver())
                 .build();
     }
 
@@ -223,9 +225,7 @@ public class ReactAgentFactory {
         return ReactAgent.builder()
                 .name("reasoning-analysis")
                 .model(model)
-                .compileConfig(CompileConfig.builder().recursionLimit(3).build())
                 .instruction(REASONING_ANALYSIS_PROMPT)
-                .includeContents(true)
                 .build();
     }
 
@@ -235,9 +235,7 @@ public class ReactAgentFactory {
         return ReactAgent.builder()
                 .name("decision-generate")
                 .model(model)
-                .compileConfig(CompileConfig.builder().recursionLimit(3).build())
                 .instruction(DECISION_GENERATE_PROMPT)
-                .includeContents(true)
                 .build();
     }
 
@@ -247,14 +245,15 @@ public class ReactAgentFactory {
         return ReactAgent.builder()
                 .name("graph-schedule")
                 .model(model)
-                .compileConfig(CompileConfig.builder().recursionLimit(3).build())
                 .instruction(GRAPH_SCHEDULE_PROMPT)
-                .includeContents(true)
                 .build();
     }
 
     // ==================== 辅助方法 ====================
 
+    /**
+     * 普通模型解析：按名称查找，不存在时回退到 {@value #DEFAULT_MODEL}。
+     */
     private ChatModel resolveModel(String modelName) {
         ChatModel model = chatModels.get(modelName);
         if (model == null) {
@@ -262,5 +261,34 @@ public class ReactAgentFactory {
             model = chatModels.get(DEFAULT_MODEL);
         }
         return model;
+    }
+
+    /**
+     * 工具调用模型解析：优先使用支持 Function Calling 的模型（如 DeepSeek）。
+     *
+     * <p>部分 OpenAI 兼容代理（如 Agnes AI 的 agnes-2.0-flash）在携带大量
+     * tool definitions 时会返回 404，因此对需要工具调用的 Agent 统一切换
+     * 到已验证支持多工具调用的 {@value #TOOLS_CAPABLE_MODEL}。
+     *
+     * @param requestedModel 请求指定的模型名（如 openAiChatModel）
+     * @return 工具调用模式下使用的 ChatModel
+     */
+    private ChatModel resolveToolModel(String requestedModel) {
+        // 如果请求的就是工具模型，直接用
+        if (TOOLS_CAPABLE_MODEL.equals(requestedModel)) {
+            ChatModel model = chatModels.get(TOOLS_CAPABLE_MODEL);
+            if (model != null) return model;
+        }
+        // 否则优先使用工具模型
+        ChatModel toolsModel = chatModels.get(TOOLS_CAPABLE_MODEL);
+        if (toolsModel != null) {
+            log.info("数据获取Agent 模型切换: {} → {}（工具调用需要 Function Calling 支持）",
+                    requestedModel, TOOLS_CAPABLE_MODEL);
+            return toolsModel;
+        }
+        // 降级：没有工具模型时使用请求的模型
+        log.warn("工具模型 '{}' 不可用，使用请求模型 '{}'（可能不支持多工具调用）",
+                TOOLS_CAPABLE_MODEL, requestedModel);
+        return resolveModel(requestedModel);
     }
 }

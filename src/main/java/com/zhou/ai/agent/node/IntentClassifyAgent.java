@@ -52,7 +52,7 @@ public class IntentClassifyAgent {
             "科技股", "消费股", "金融股", "板块", "行业",
             "etf", "指数", "纳斯达克", "标普", "道琼斯",
             "对冲", "套利", "杠杆", "做多", "做空",
-            "投资组合", "分散", "配置",
+            "投资组合", "分散",
             "盈利", "亏损", "涨", "跌", "涨幅", "跌幅",
             "开户", "交易", "手续费", "佣金"
     );
@@ -131,7 +131,7 @@ public class IntentClassifyAgent {
             ));
 
         } catch (Exception e) {
-            log.warn("[意图分类Agent] entity异常，默认放行: {}", e.getMessage());
+            log.warn("[意图分类Agent] entity异常，默认放行: {}", e.getMessage(), e);
             return CompletableFuture.completedFuture(Map.of(
                     AgentGraphState.INTENT_RESULT, "LLM分类异常，默认放行: " + e.getMessage(),
                     AgentGraphState.IS_INVESTMENT, "true"
