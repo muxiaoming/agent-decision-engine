@@ -1,321 +1,184 @@
-# AgentDecisionEngine
+# AgentDecisionEngine — 7节点投资决策团队求职
 
-基于 Spring AI Alibaba + ReactAgent 的多模型智能投资决策引擎，采用 7 节点 Multi-Agent Graph 架构，实现从意图识别、问题感知、知识检索、数据获取、推理分析到投资建议生成的全流程自动化。
+> 项目是一支由 **7 名 AI Agent 组成的投资决策团队**，精通意图理解、金融知识检索、市场数据采集、深度推演与决策生成。采用 **Java 21 虚拟线程 + Reactor Flux 并行调度**，最快 ~2 分钟完成从用户需求到投资报告的完整链路。现寻求一个有挑战性的业务场景施展才华。
 
-## 技术栈
+## 👥 团队成员
 
-| 组件 | 版本 | 用途 |
+| 编号 | 姓名 | 职位 | 擅长 |
+|------|------|------|------|
+| 1 | IntentClassifyAgent | 意图分类 | 两层递进分类（关键词白名单 + LLM 结构化分类），非投资消息直接婉拒，节省团队精力 |
+| 2 | ProblemPerceptionAgent | 需求分析师 | 理解用户投资目标、预算、风险偏好、期限，输出结构化需求画像 |
+| 3 | KnowledgeRetrievalAgent | 金融知识专家 | ReAct 工具调用，向量检索金融知识库，提供专业领域支撑 |
+| 4 | DataFetchAgent | 市场数据专员 | ReAct 多工具调用（股价/指数/波动率/VaR/夏普比率），自动适配 Function Calling 模型 |
+| 5 | ReasoningAnalysisAgent | 资深金融分析师 | 综合知识+数据，评估趋势/风险/收益，给出置信度标注 |
+| 6 | DecisionGenerateAgent | 投资顾问 | 生成结构化投资建议（策略/操作/风控/期限），严格执行风险声明 |
+| 7 | GraphScheduleAgent | 流程主管 | 汇总验证各成员输出，一致性评估，签署最终报告 |
+
+### 协作关系
+
+```
+用户需求
+  │                 ←── 【开启虚拟线程】
+  ├── [1. 前台] 意图分类 ←── 投资? 
+  │         │
+  │         ✔ (进入团队)
+  │         │
+  │   [2. 需求分析师] 问题感知
+  │         │
+  │    ┌────┴────┐  ←── 【虚拟线程并行】
+  │    │         │
+  │  [3. 知识专家] [4. 数据专员]
+  │   RAG检索    市场数据
+  │    │         │
+  │    └────┬────┘
+  │         │
+  │   [5. 资深分析师] 综合推演
+  │         │
+  │   [6. 投资顾问] 决策生成
+  │         │
+  │   [7. 流程主管] 汇总签署
+  │         │
+  │    ┌────┴────┐
+  │    │  最终报告 + Langfuse 审计追踪
+  │    └─────────┘
+  │
+  └── ✘ (非投资) → "我是投资助手，请咨询投资理财问题"
+```
+
+## 🚀 专业技能
+
+### 多模型适配
+- **DeepSeek**：主力推理 + Function Calling
+- **OpenAI 兼容**：Agnes AI 等代理
+- **DashScope Qwen**：中文优化场景
+- **智能路由**：工具调用自动切换到支持 Function Calling 的模型，避免上游 404
+
+### 工具调用 (Function Calling)
+- `getStockPrice(symbol)` — 实时股价
+- `getMarketIndex(indexName)` — 大盘指数
+- `getMarketVolatility()` / `getMarketSentiment()` — 市场情绪
+- `calculateValueAtRisk(amount, confidence, days)` — VaR 计算
+- `calculateSharpeRatio(return, riskFree, volatility)` — 夏普比率
+- `calculatePortfolioReturn(stock, bond, cash)` — 组合收益
+- `retrieveKnowledge(query)` — 向量知识检索
+
+### 流式 SSE 推送
+每一步进展实时推送给前端（打字机效果），用户无需等待全部完成就能看到团队工作进程。
+
+### 全链路可观测 (Langfuse 3.x)
+- 每个团队成员的推理过程可追溯
+- Token 用量 + 成本实时追踪
+- 支持本地/云端双模式部署
+
+## 🏗️ 技术功底
+
+| 技术 | 版本 | 用途 |
 |------|------|------|
-| Spring Boot | 3.4.5 | 应用框架 |
+| Spring Boot | 3.3.7 | 应用框架 |
 | Spring AI | 1.1.2 | AI 模型抽象层 |
-| Spring AI Alibaba | 1.1.2.2 | DashScope 集成 + ReactAgent + Graph 工作流 |
-| Langfuse | 3.x | AI 可观测性平台（本地/云端） |
-| Java | 21 | 运行时（虚拟线程） |
-| OpenTelemetry | 2.17.0 | 指标和追踪导出 |
-| Knife4j | 4.5.0 | OpenAPI 文档 |
+| Spring AI Alibaba | 1.1.2.2 | ReactAgent + Graph + DashScope |
+| **Java 21 Virtual Threads** | — | **全局虚拟线程，零池化限制** |
+| Reactor Flux | — | 响应式流 + Flux.merge 并行调度 |
+| Langfuse | 3.x | 可观测性平台 |
+| OpenTelemetry | 2.17.0 | Trace 导出 |
+| Knife4j | 4.5.0 | API 文档 |
 
-## 核心功能
-
-### 🎯 多 Agent Graph 投资决策引擎
-
-本项目构建了一个**基于 Multi-Agent Graph 架构的投资决策系统**，7 个独立的 ReactAgent 节点各司其职，通过手动 `Flux.concat()` 串联实现真正的逐节点流式推送（打字机效果）。
-
-### 📊 决策链路
+### 并发模型亮点
 
 ```
-用户投资需求
-     ↓
-┌─────────────────────────────────────┐
-│  1. IntentClassifyAgent (意图分类)   │
-│     两层递进：关键词匹配 → LLM 分类   │
-│     非投资消息直接返回，不执行后续步骤  │
-├─────────────────────────────────────┤
-│  2. ProblemPerceptionAgent (问题感知) │
-│     理解用户需求、约束条件和风险偏好    │
-├─────────────────────────────────────┤
-│  3. KnowledgeRetrievalAgent (知识检索)│
-│     ReAct 工具调用：向量检索金融知识   │
-│     模型自动切换 DeepSeek (Function Calling) │
-├─────────────────────────────────────┤
-│  4. DataFetchAgent (数据获取)        │
-│     ReAct 多工具调用：股价/指数/风险   │
-│     NonTransientAiException 降级处理  │
-├─────────────────────────────────────┤
-│  5. ReasoningAnalysisAgent (推理分析)│
-│     分析风险收益、识别投资机会         │
-├─────────────────────────────────────┤
-│  6. DecisionGenerateAgent (决策生成) │
-│     生成结构化投资建议和风险提示       │
-├─────────────────────────────────────┤
-│  7. GraphScheduleAgent (汇总输出)    │
-│     汇总验证各步骤结果，输出最终报告    │
-└─────────────────────────────────────┘
-     ↓
-  投资决策报告 + Langfuse 全链路追踪
+Tomcat 请求线程 (Virtual Thread) ← spring.threads.virtual.enabled=true
+  │
+  ├─ Step 1 (意图分类)     → 虚拟线程 #1
+  ├─ Step 2 (问题感知)     → 虚拟线程 #2
+  ├─ Step 3 (知识检索) ┐
+  │                     ├─ Flux.merge() 并行 → 虚拟线程 #3 + #4
+  ├─ Step 4 (数据获取) ┘
+  ├─ Step 5 (推理分析)     → 虚拟线程 #5
+  ├─ Step 6 (决策生成)     → 虚拟线程 #6
+  └─ Step 7 (汇总输出)     → 虚拟线程 #7
 ```
 
-### 🤖 多模型代理
+- **全局**：`spring.threads.virtual.enabled=true` 自动配置 Tomcat + `@Async` + `TaskExecutor` 为虚拟线程
+- **步骤执行**：`Executors.newVirtualThreadPerTaskExecutor()` → Reactor Scheduler，每个阻塞 LLM 调用独立虚拟线程
+- **Steps 3+4 并行**：`Flux.merge()` 替代串行 `Flux.concat()`，知识检索与数据获取并发，节省约 30-45 秒
+- **线程安全**：`ConcurrentHashMap` 承载多 Agent 共享状态
 
-- **支持模型**: DeepSeek、OpenAI 兼容、DashScope Qwen
-- **智能模型路由**: 需要 Function Calling 的节点（知识检索、数据获取）自动切换到 DeepSeek（`resolveToolModel()`），避免部分 OpenAI 兼容代理在多工具定义场景下返回 404
-- **流式输出**: 基于 `Flux.concat()` + `Flux.defer()` + `Schedulers.boundedElastic()` 实现真正的逐节点推送，前端获得打字机效果
-- **降级策略**: 上游模型不可用（NonTransientAiException）时自动填充参考数据，不中断决策流程
+## ⚡ 快速体验
 
-### 🔧 投资工具集 (Function Calling)
-
-- **股价查询工具**: 获取实时股票价格和历史数据
-- **市场指标工具**: 获取市场整体指标（指数、波动率等）
-- **风险计算器**: 计算投资组合的风险指标
-- **知识检索工具**: 向量语义检索金融知识库
-- **自动装配**: 工具自动注册到 ReactAgent 节点
-
-### 📊 Langfuse 可观测性
-
-- **全链路追踪**: 从用户需求到投资建议的完整追踪
-- **决策审计**: 记录每个 Agent 节点的推理过程
-- **成本监控**: 追踪 token 用量、响应时间、成功率
-- **调试模式**: 支持本地和云端 Langfuse 双模式
-- **健康检查**: `/api/observability/health` 验证连接状态
-
-### 🧩 流式推送机制
-
-采用手动 `Flux.concat()` 链替代 `StateGraph.compile().invoke()` 的原因：
-
-`CompiledGraph.stream()` 虽返回 `Flux<NodeOutput>`，但每个 Agent 的 `AsyncNodeAction` 内部同步阻塞等待 LLM 响应后返回已完成 Future，导致 GraphRunner 看到所有节点瞬间完成，所有 NodeOutput 几乎同时 emit，前端无法获得打字机效果。
-
-**解决方案**：手动 `Flux.concat()` 串联各节点的 `AsyncNodeAction`，配合 `Flux.defer()` 确保阻塞 LLM 调用在上一步事件推送完成之后才订阅执行，`Schedulers.boundedElastic()` 将阻塞调用踢出 NIO 线程。
-
-```
-Flux.concat(
-  step1: intentClassify,
-  Flux.defer(() -> {        // 仅当 step1 完成后才订阅
-    if (非投资) return completeEvent;
-    return Flux.concat(
-      step2: problemPerception,
-      step3: knowledgeRetrieval,
-      step4: dataFetch,
-      step5: reasoningAnalysis,
-      step6: decisionGenerate,
-      step7: graphSchedule,
-      decisionComplete
-    );
-  })
-)
-```
-
-## 架构概览
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Client (Web App / API / curl)                             │
-└──────────┬──────────────────────────────────────────────────┘
-           │
-           ▼
-┌──────────────────┐
-│ MultiAgentController │  ← /agent/decide/stream (SSE)
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────────────────────────────────────────────────┐
-│ MultiAgentInvestService                                      │
-│ ┌──────────────────────────────────────────────────────────┐ │
-│ │ Flux.concat() 7-Node Pipeline                            │ │
-│ │                                                          │ │
-│ │  1. IntentClassifyAgent    → 意图分类 + 非投资过滤        │ │
-│ │  2. ProblemPerceptionAgent → 问题理解                     │ │
-│ │  3. KnowledgeRetrievalAgent → ReAct 知识检索 (DeepSeek)  │ │
-│ │  4. DataFetchAgent         → ReAct 数据获取 (DeepSeek)   │ │
-│ │  5. ReasoningAnalysisAgent → 推理分析                     │ │
-│ │  6. DecisionGenerateAgent  → 决策生成                     │ │
-│ │  7. GraphScheduleAgent     → 汇总输出                     │ │
-│ └──────────────────────────────────────────────────────────┘ │
-│                                                              │
-│ ┌──────────────────────────────────────────────────────────┐ │
-│ │ ReactAgentFactory (Agent 工厂)                           │ │
-│ │ ├── resolveModel()      → 普通模型解析                    │ │
-│ │ ├── resolveToolModel()  → 工具调用自动切 DeepSeek         │ │
-│ │ └── 7 个 Agent Builder   → 统一构建和管理                 │ │
-│ └──────────────────────────────────────────────────────────┘ │
-│                                                              │
-│ ┌──────────────────────────────────────────────────────────┐ │
-│ │ ToolCallbackProvider (工具集)                             │ │
-│ │ ├── StockPriceTool, MarketIndexTool, RiskCalculator      │ │
-│ │ └── KnowledgeRetrievalTool                               │ │
-│ └──────────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────────┘
-         │
-    ┌────┴────┐
-    │         │
-    ▼         ▼
-┌────────┐ ┌────────┐
-│ RAG    │ │Langfuse│  ← 知识检索 + 全链路追踪
-└────────┘ └────────┘
-```
-
-## 快速启动
-
-### 前提条件
+### 环境要求
 - Java 21+
-- Docker & Docker Compose
+- Docker（Langfuse 本地追踪）
 - Maven 3.9+
 
-### 1. 克隆和构建
+### 启动
 
 ```bash
-git clone https://github.com/your-repo/agent-decision-engine.git
-cd agent-decision-engine
-mvn clean install -DskipTests
-```
-
-### 2. 启动 Langfuse
-
-```bash
+# 1. 启动 Langfuse 追踪
 docker compose -f docker/docker-compose-langfuse.yml up -d
-```
 
-访问 `http://localhost:3000` 完成 Langfuse 初始化。
+# 2. 配置 API Key（application-dev.yml）
+spring.ai.deepseek.api-key=你的key
+spring.ai.openai.api-key=你的key
 
-### 3. 配置 API 密钥
-
-创建 `src/main/resources/application-dev.yml`：
-
-```yaml
-spring:
-  ai:
-    deepseek:
-      api-key: your-deepseek-key
-    openai:
-      api-key: your-openai-compatible-key
-    dashscope:
-      api-key: your-dashscope-key
-
-otel:
-  exporter:
-    otlp:
-      headers:
-        Authorization: "Basic your-langfuse-credentials"
-```
-
-### 4. 启动应用
-
-```bash
-# 使用 dev 配置启动
+# 3. 启动应用
 mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-应用启动后访问:
-- **API 文档**: `http://localhost:8182/swagger-ui.html`
-- **健康检查**: `http://localhost:8182/agent/health`
+### 面试我们（调 API）
 
-### 5. 测试多 Agent 决策 API
-
-**流式决策请求（SSE）**
 ```bash
-curl -X POST http://localhost:8182/agent/decide/stream \
+# 流式决策（看我们团队实时工作）
+curl -X POST http://localhost:8182/api/agent/decide/stream \
   -H "Content-Type: application/json" \
-  -d '{
-    "message": "我想投资科技股，风险承受能力中等，预算 10 万",
-    "modelName": "openAiChatModel"
-  }'
+  -d '{"message":"我想投资科技股，预算10万，风险中等"}'
+
+# 健康检查
+curl http://localhost:8182/api/agent/health
 ```
 
-**GET 方式流式请求**
-```bash
-curl "http://localhost:8182/agent/decide/stream?message=分析一下AI行业的投资机会&modelName=openAiChatModel"
+观察 Steps 3+4 的 stepStart 事件几乎同时到达，确认**并行执行**生效。
+
+访问 `http://localhost:8182/swagger-ui.html` 查看完整 API 文档。
+
+## 📂 项目结构
+
+```
+src/main/java/com/zhou/ai/
+├── agent/
+│   ├── controller/MultiAgentController.java    # REST 入口
+│   ├── service/MultiAgentInvestService.java    # 7 节点 Flux 编排 + 虚拟线程调度
+│   ├── node/                                   # 7 个 Agent 节点
+│   │   ├── IntentClassifyAgent.java
+│   │   ├── ProblemPerceptionAgent.java
+│   │   ├── KnowledgeRetrievalAgent.java
+│   │   ├── DataFetchAgent.java
+│   │   ├── ReasoningAnalysisAgent.java
+│   │   ├── DecisionGenerateAgent.java
+│   │   └── GraphScheduleAgent.java
+│   ├── config/
+│   │   ├── ReactAgentFactory.java              # Agent 工厂 + 模型路由
+│   │   └── MultiChatClientConfig.java
+│   └── model/
+│       ├── AgentGraphState.java                # 状态键常量
+│       └── AgentPipelineContext.java            # 上下文记录（空值兜底）
+├── investment/                                 # 遗留流程（另一个团队）
+├── observability/                              # Langfuse 追踪
+├── graph/                                      # Graph 工作流
+├── skills/                                     # Skills 技能框架
+└── tools/                                      # 投资工具集
 ```
 
-**健康检查**
-```bash
-curl http://localhost:8182/agent/health
-```
+## 🔧 配置
 
-## 配置选项
+| 环境变量 | 说明 |
+|----------|------|
+| `DEEPSEEK_API_KEY` | DeepSeek API 密钥 |
+| `AGNES_AI_API_KEY` | OpenAI 兼容 API 密钥 |
+| `DASHSCOPE_API_KEY` | DashScope API 密钥 |
 
-### 环境变量
+Spring Profiles: `local` (本地Langfuse), `cloud` (云端Langfuse), `dev` (开发密钥, gitignore)
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `DEEPSEEK_API_KEY` | DeepSeek API 密钥 | - |
-| `OPENAI_API_KEY` | OpenAI 兼容 API 密钥 | - |
-| `DASHSCOPE_API_KEY` | DashScope API 密钥 | - |
-| `LANGFUSE_MODE` | Langfuse 模式 (local/cloud) | `local` |
-
-### Spring Profiles
-
-| Profile | 说明 |
-|---------|------|
-| `local` | 本地 Langfuse 部署 |
-| `cloud` | 云端 Langfuse |
-| `dev` | 开发配置（不提交到 git） |
-
-### 模型路由策略
-
-| Agent 节点 | 模型策略 | 说明 |
-|-----------|---------|------|
-| IntentClassifyAgent | `resolveModel()` | 普通 LLM 调用 |
-| ProblemPerceptionAgent | `resolveModel()` | 普通 LLM 调用 |
-| KnowledgeRetrievalAgent | `resolveToolModel()` → DeepSeek | 需要 Function Calling |
-| DataFetchAgent | `resolveToolModel()` → DeepSeek | 需要多工具调用 |
-| ReasoningAnalysisAgent | `resolveModel()` | 普通 LLM 调用 |
-| DecisionGenerateAgent | `resolveModel()` | 普通 LLM 调用 |
-| GraphScheduleAgent | `resolveModel()` | 普通 LLM 调用 |
-
-## 文档
-
-- **功能规格**: `specs/001-agent-decision-engine/spec.md`
-- **实现计划**: `specs/001-agent-decision-engine/plan.md`
-- **数据模型**: `specs/001-agent-decision-engine/data-model.md`
-- **API 契约**: `specs/001-agent-decision-engine/contracts/api.md`
-- **快速启动**: `specs/001-agent-decision-engine/quickstart.md`
-
-## 开发指南
-
-### 添加新 Agent 节点
-
-1. 在 `node/` 包中创建新的 Agent 类
-2. 实现 `asNodeAction()` 方法返回 `AsyncNodeAction`
-3. 在 `ReactAgentFactory` 中添加 Agent 构建方法
-4. 在 `MultiAgentInvestService` 中注入并添加到 `Flux.concat()` 链
-
-### 添加新工具
-
-1. 创建 `@Component` 类并使用 `@Tool` 注解
-2. 工具自动注册到 `ToolCallbackProvider`
-3. 在 `ReactAgentFactory` 中通过 `.methodTools()` 注册到对应 Agent
-
-### 集成新的 Langfuse 特性
-
-参考 Langfuse 3.x 文档和 `observability` 包中的实现。
-
-## 故障排除
-
-### 连接 Langfuse 失败
-
-```bash
-# 检查 Langfuse 是否运行
-docker compose -f docker/docker-compose-langfuse.yml ps
-
-# 验证健康状态
-curl http://localhost:8182/api/observability/health
-```
-
-### 工具调用返回 404
-
-如果使用 OpenAI 兼容代理（如 Agnes AI），多工具调用可能返回 404。系统已自动将 KnowledgeRetrievalAgent 和 DataFetchAgent 切换到 DeepSeek 模型。
-
-### 向量存储数据丢失
-
-`SimpleVectorStore` 存储在内存中，重启应用会丢失数据。切换到生产向量存储：
-
-- **Chroma**: `spring-ai-starter-vector-store-chroma`
-- **Milvus**: `spring-ai-starter-vector-store-milvus`
-- **PostgreSQL**: `spring-ai-starter-vector-store-pgvector`
-
-## 贡献
-
-欢迎通过 Issue 和 Pull Request 贡献代码。
-
-## 许可
+## 📄 许可
 
 MIT License
 
