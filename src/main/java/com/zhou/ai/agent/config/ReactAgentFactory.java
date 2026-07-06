@@ -36,7 +36,7 @@ public class ReactAgentFactory {
     private static final String DEFAULT_MODEL = "openAiChatModel";
 
     /** 需要 Function Calling 能力的 Agent 优先使用的模型（DeepSeek 支持多工具调用）。 */
-    private static final String TOOLS_CAPABLE_MODEL = "deepSeekChatModel";
+    private static final String TOOLS_CAPABLE_MODEL = "openAiChatModel";
 
     // ==================== 系统提示词（与原有 MultiChatClientConfig 保持一致） ====================
 
@@ -190,6 +190,7 @@ public class ReactAgentFactory {
                 .name("problem-perception")
                 .model(model)
                 .instruction(PROBLEM_PERCEPTION_PROMPT)
+                .hooks(ModelCallLimitHook.builder().runLimit(1).build())
                 .build();
     }
 
@@ -226,6 +227,7 @@ public class ReactAgentFactory {
                 .name("reasoning-analysis")
                 .model(model)
                 .instruction(REASONING_ANALYSIS_PROMPT)
+                .hooks(ModelCallLimitHook.builder().runLimit(1).build())
                 .build();
     }
 
@@ -236,6 +238,7 @@ public class ReactAgentFactory {
                 .name("decision-generate")
                 .model(model)
                 .instruction(DECISION_GENERATE_PROMPT)
+                .hooks(ModelCallLimitHook.builder().runLimit(1).build())
                 .build();
     }
 
@@ -246,6 +249,7 @@ public class ReactAgentFactory {
                 .name("graph-schedule")
                 .model(model)
                 .instruction(GRAPH_SCHEDULE_PROMPT)
+                .hooks(ModelCallLimitHook.builder().runLimit(1).build())
                 .build();
     }
 
